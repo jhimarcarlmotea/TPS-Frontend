@@ -95,7 +95,7 @@ export default function AdminSchedule() {
   const [toTime, setToTime] = useState("12:00");
 
   const monthKey = `${view.year}-${pad(view.month + 1)}`;
-
+    const isCurrentMonth = view.year === today.getFullYear() && view.month === today.getMonth();
   /* ---------- load from backend ---------- */
   const loadSchedule = useCallback(async () => {
     setLoading(true);
@@ -157,19 +157,38 @@ export default function AdminSchedule() {
   const fullDayName = DAY_FULL[selDateObj.getDay()];
   const shortMonth = MONTHS[selDateObj.getMonth()].slice(0, 3);
 
+    
+  useEffect(() => {
+    const day = slotsByDate[selectedDate] || [];
+    setAvailabilityMode(day.some((s) => s.status === "unavailable") ? "not_available" : "available");
+  }, [selectedDate, slotsByDate]);
+
   const handleSelectDay = (cell) => {
-    if (cell.date < todayISO) return; // lumipas na, hindi na pwedeng i-click
+    if (cell.date < todayISO) return;
     setSelectedDate(cell.date);
     setError("");
     setNotice("");
-    const daySlots = slotsByDate[cell.date] || [];
-    setAvailabilityMode(daySlots.some((s) => s.status === "unavailable") ? "not_available" : "available");
     if (cell.other) setView({ year: parseISO(cell.date).getFullYear(), month: parseISO(cell.date).getMonth() });
   };
 
   const changeMonth = (delta) => {
     const d = new Date(view.year, view.month + delta, 1);
+
+    
+    if (
+      d.getFullYear() < today.getFullYear() ||
+      (d.getFullYear() === today.getFullYear() && d.getMonth() < today.getMonth())
+    ) {
+      return;
+    }
+
     setView({ year: d.getFullYear(), month: d.getMonth() });
+    setError("");
+    setNotice("");
+
+    
+    const isCurrent = d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth();
+    setSelectedDate(isCurrent ? todayISO : toISO(d.getFullYear(), d.getMonth(), 1));
   };
 
   /* ---------- save to backend ---------- */
@@ -295,10 +314,11 @@ export default function AdminSchedule() {
 
                   <div className="flex items-center gap-[8px]">
                     <button
-                      onClick={() => changeMonth(-1)}
-                      className="w-[28px] h-[28px] rounded-full bg-[#dcf0e8] text-[#1f6b55] flex items-center justify-center hover:bg-[#cbe8dc] transition-colors cursor-pointer border-0"
-                      aria-label="Previous month"
-                    >
+                    onClick={() => changeMonth(-1)}
+                    disabled={isCurrentMonth}
+                    className="w-[28px] h-[28px] rounded-full bg-[#dcf0e8] text-[#1f6b55] flex items-center justify-center hover:bg-[#cbe8dc] transition-colors cursor-pointer border-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="Previous month"
+                  >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <polyline points="15 18 9 12 15 6" />
                       </svg>

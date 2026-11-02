@@ -43,7 +43,7 @@ export default function ReviewAndPay() {
 
   const serviceId = booking.serviceId;
   const c = booking.client || {};
-
+  const draft = booking.paymentDraft || null;
   const holdActive =
     !!booking.holdId &&
     !!booking.holdExpiresAt &&
@@ -52,9 +52,9 @@ export default function ReviewAndPay() {
   const [options, setOptions] = useState(null);
   const [optError, setOptError] = useState("");
   const [methodId, setMethodId] = useState(null);
-  const [type, setType] = useState("full");
-  const [walletNumber, setWalletNumber] = useState("");
-  const [refNum, setRefNum] = useState("");
+  const [type, setType] = useState(draft?.type || "full");
+  const [walletNumber, setWalletNumber] = useState(draft?.wallet_number || "");
+  const [refNum, setRefNum] = useState(draft?.reference_number || "");
   const [receipt, setReceipt] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -67,7 +67,11 @@ export default function ReviewAndPay() {
       .then((d) => {
         if (!alive) return;
         setOptions(d);
-        setMethodId((cur) => cur ?? d.methods?.[0]?.id ?? null);
+                setMethodId((cur) => {
+          if (cur != null) return cur;
+          const prev = draft && d.methods?.find((m) => m.name === draft.method_name);
+          return prev?.id ?? d.methods?.[0]?.id ?? null;
+        });
       })
       .catch((err) => {
         if (!alive) return;
@@ -152,10 +156,23 @@ export default function ReviewAndPay() {
         paymentId: p.id,
         holdId: null,
         holdExpiresAt: null,
+        paymentDraft: null,
       });
       navigate("/book/approval", { replace: true });
-    } catch (err) {
+        } catch (err) {
       if (err.message?.includes("session expired")) return navigate("/signin");
+      // Expired na ang hold sa server: linisin ang naiwang hold sa context
+      if (err.message?.includes("held time has expired")) {
+        update({
+          holdId: null,
+          holdExpiresAt: null,
+          date: null,
+          time: null,
+          timeStart: null,
+          timeEnd: null,
+          providerId: null,
+        });
+      }
       setError(err.message || "Could not submit your payment. Please try again.");
     } finally {
       setSubmitting(false);

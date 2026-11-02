@@ -379,6 +379,15 @@ function PaymentRow({ data, onOpen }) {
   );
 }
 
+const QUICK_REPLIES = [
+  ["Number mismatch", "The sender number you entered does not match the one in your proof of payment."],
+  ["Wrong amount", "The amount in your proof of payment does not match the amount due."],
+  ["Reference mismatch", "The reference number you entered does not match your receipt."],
+  ["Blurry receipt", "Your receipt is blurry or cut off. Please upload a clear, full screenshot."],
+  ["Not received", "We could not find this payment in our account yet. Please check and send it again."],
+  ["Wrong method", "The receipt shows a different payment method than the one you selected."],
+];
+
 function ReceiptModal({ p, base, onClose, onUpdated }) {
   const [busy, setBusy] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -391,10 +400,11 @@ function ReceiptModal({ p, base, onClose, onUpdated }) {
     try {
       const d = await apiFetch(`${base}/payments/${p.id}/${kind}`, {
         method: "POST",
-        body: JSON.stringify(kind === "reject" ? { reason: reason.trim() || null } : {}),
+        body: JSON.stringify(kind === "reject" ? { reason: reason.trim() } : {}),
       });
       onUpdated(d.payment);
       setRejecting(false);
+      setReason("");
     } catch (err) {
       setError(err.message || "Something went wrong.");
     } finally {
@@ -456,7 +466,7 @@ function ReceiptModal({ p, base, onClose, onUpdated }) {
 
           {p.status === "rejected" && p.reject_reason && (
             <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-              Rejected: {p.reject_reason}
+              Message sent to client: {p.reject_reason}
             </p>
           )}
 
@@ -467,22 +477,48 @@ function ReceiptModal({ p, base, onClose, onUpdated }) {
           )}
 
           {rejecting && (
-            <textarea
-              rows={2}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Reason (optional)"
-              className={`${serif} mt-3 w-full resize-none rounded-md border border-black/20 p-2 text-sm`}
-            />
+            <div className="mt-4">
+              <p className={`${inter} m-0 mb-2 text-[11px] font-bold tracking-[1.5px] text-[#666]`}>
+                MESSAGE TO CLIENT
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_REPLIES.map(([label, text]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setReason(text)}
+                    className={`${serif} cursor-pointer rounded-full border px-3 py-1 text-[12px] transition ${
+                      reason === text
+                        ? "border-[#11a086] bg-[#e3f2ee] text-[#1f6b55]"
+                        : "border-[#c7b6b6] bg-white text-[#202020] hover:bg-[#f2f2f2]"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                rows={3}
+                maxLength={255}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Tap a quick reply above, or write your own message…"
+                className={`${serif} mt-3 w-full resize-none rounded-md border border-black/20 p-2 text-sm`}
+              />
+              <p className={`${serif} m-0 mt-1 text-right text-[11px] text-[#888]`}>{reason.length}/255</p>
+              <p className={`${serif} m-0 mt-1 text-[11px] text-[#666]`}>
+                The client will see this message on their appointment status page and will be asked to go back to payment.
+              </p>
+            </div>
           )}
 
           <div className="mt-5 flex flex-wrap justify-end gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={rejecting ? () => { setRejecting(false); setReason(""); setError(""); } : onClose}
               className={`${serif} cursor-pointer rounded-md border border-[#c7b6b6] bg-white px-4 py-2 text-sm`}
             >
-              Close
+              {rejecting ? "Cancel" : "Close"}
             </button>
             {p.status === "to_verify" && !rejecting && (
               <button
@@ -497,11 +533,11 @@ function ReceiptModal({ p, base, onClose, onUpdated }) {
             {p.status === "to_verify" && rejecting && (
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || reason.trim().length < 3}
                 onClick={() => act("reject")}
-                className={`${serif} cursor-pointer rounded-md border-0 bg-red-600 px-4 py-2 text-sm text-white disabled:opacity-60`}
+                className={`${serif} cursor-pointer rounded-md border-0 bg-red-600 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                {busy ? "Please wait…" : "Confirm reject"}
+                {busy ? "Please wait…" : "Send message & reject"}
               </button>
             )}
             {p.status === "to_verify" && !rejecting && (

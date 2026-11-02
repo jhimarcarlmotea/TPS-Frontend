@@ -28,6 +28,7 @@ import AffiliateAppointment from "./affiliate/affiliateappointment";
 import AffiliateSchedule from "./affiliate/affiliateschedule";
 import AffiliatePayment from "./affiliate/affiliatepayment";
 import Profile from "./pages/Profile";
+import HoldExpiryModal from "./BookSession/HoldExpiryModal";
 
 const ClientArea = ({ children }) => (
   <RequireAuth roles={["CLIENT", "ADMIN"]}>{children}</RequireAuth>
@@ -43,8 +44,9 @@ const AffiliateOnly = ({ children }) => (
 function BookingLayout() {
   return (
     <ClientArea>
-      <BookingProvider>
+       <BookingProvider>
         <Outlet />
+        <HoldExpiryModal />
       </BookingProvider>
     </ClientArea>
   );

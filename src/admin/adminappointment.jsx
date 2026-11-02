@@ -24,6 +24,7 @@ const STATUS = {
     approved: { chip: "Approved", cls: "bg-[#a9d0c8] text-[#1f4d3f]", steps: ["done", "done", "current"] },
     completed: { chip: "Completed", cls: "bg-[#e6e6e6] text-[#555]", steps: ["done", "done", "done"] },
     declined: { chip: "Declined", cls: "bg-red-100 text-red-700", steps: ["done", "todo", "todo"] },
+    cancelled: { chip: "Cancelled", cls: "bg-[#eeeeee] text-[#666]", steps: ["done", "todo", "todo"] },
 };
 
 const FILTERS = [
@@ -31,13 +32,19 @@ const FILTERS = [
     ["verify", "To verify"],
     ["pending", "Pending approval"],
     ["approved", "Approved"],
-    ["completed", "Completed"],
+    ["history", "History"],
 ];
+
+// Mga appointment na tapos na (napupunta sa History)
+const FINISHED = ["completed", "declined", "cancelled"];
+
+const fmtStamp = (iso) =>
+    new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 /* ------------------------------------------------------------------ */
 /*  Building blocks                                                    */
 /* ------------------------------------------------------------------ */
-const Header = () => {
+const Header = ({ onMenu }) => {
     const todayLabel = new Date().toLocaleDateString("en-US", {
         weekday: "long",
         month: "long",
@@ -46,6 +53,16 @@ const Header = () => {
     return (
         <header className="flex items-start justify-between">
             <div>
+                <button
+                    type="button"
+                    onClick={onMenu}
+                    aria-label="Open menu"
+                    className="mb-[12px] flex h-[37px] w-[46px] items-center justify-center rounded-[8px] border border-[#c7b6b6] bg-white lg:hidden"
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2a8570" strokeWidth="2" strokeLinecap="round">
+                        <path d="M3 6h18M3 12h18M3 18h18" />
+                    </svg>
+                </button>
                 <div className={`${inter} text-[20px] font-bold tracking-[4.2px] text-[#4a9b8e]`}>APPOINTMENT</div>
                 <h1 className={`${serif} mt-[8px] text-[40px] font-bold leading-[1.15] text-[#2f4a42]`}>
                     Everyone who booked with you.
@@ -146,6 +163,7 @@ const ConsentChip = ({ status }) => {
         </span>
     );
 };
+
 const StatusChip = ({ s, className = "" }) => (
     <span
         className={`${serif} h-[24px] items-center justify-center rounded-full px-[12px] text-[11px] font-bold ${s.cls} ${className}`}
@@ -153,6 +171,7 @@ const StatusChip = ({ s, className = "" }) => (
         {s.chip}
     </span>
 );
+
 const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVerify, onViewConsent }) => {
     const s = STATUS[a.state] || STATUS.pending;
     const d = new Date(a.date + "T00:00");
@@ -174,6 +193,18 @@ const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVer
                         {a.service_name} · {to12(a.start_time)} – {to12(a.end_time)}
                         <ConsentChip status={a.consent_status} />
                     </div>
+
+                    {/* Detalye ng history */}
+                    {a.state === "completed" && a.completed_at && (
+                        <div className={`${serif} mt-[2px] text-[12px] text-[#666]`}>Completed on {fmtStamp(a.completed_at)}</div>
+                    )}
+                    {a.state === "cancelled" && a.cancelled_at && (
+                        <div className={`${serif} mt-[2px] text-[12px] text-[#666]`}>Cancelled by client on {fmtStamp(a.cancelled_at)}</div>
+                    )}
+                    {a.state === "declined" && a.decline_reason && (
+                        <div className={`${serif} mt-[2px] text-[12px] text-[#666]`}>Reason: {a.decline_reason}</div>
+                    )}
+
                     {/* chip dito sa mobile/tablet */}
                     <StatusChip s={s} className="mt-[8px] inline-flex xl:hidden" />
                 </div>
@@ -200,7 +231,6 @@ const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVer
                 </button>
 
                 <div className="flex items-center gap-[8px]">
-
                     {a.consent_status === "submitted" && (
                         <button
                             type="button"
@@ -224,8 +254,6 @@ const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVer
                     )}
                 </div>
             </div>
-
-
 
             {open && (
                 <div className="mt-[14px] grid grid-cols-1 gap-[16px] rounded-[6px] border border-[#c9d9d4] bg-[#e8f1ee] px-[16px] py-[16px] sm:grid-cols-3 sm:gap-[24px] sm:px-[24px] sm:py-[18px]">
@@ -293,6 +321,9 @@ export default function AdminAppointment() {
     const navigate = useNavigate();
     const [navOpen, setNavOpen] = useState(false);
     const [items, setItems] = useState([]);
+    const [history, setHistory] = useState(null); // null = hindi pa na-load
+    const [historyCount, setHistoryCount] = useState(0);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [filter, setFilter] = useState("all");
@@ -303,10 +334,23 @@ export default function AdminAppointment() {
 
     useEffect(() => {
         apiFetch(`${API_BASE}/appointments`)
-            .then((d) => setItems(d.appointments || []))
+            .then((d) => {
+                setItems(d.appointments || []);
+                setHistoryCount(d.history_count || 0);
+            })
             .catch((err) => setError(err.message || "Could not load appointments."))
             .finally(() => setLoading(false));
     }, []);
+
+    // Kunin ang history kapag binuksan ang History tab (isang beses lang)
+    useEffect(() => {
+        if (filter !== "history" || history !== null) return;
+        setHistoryLoading(true);
+        apiFetch(`${API_BASE}/appointments/history`)
+            .then((d) => setHistory(d.appointments || []))
+            .catch((err) => setError(err.message || "Could not load history."))
+            .finally(() => setHistoryLoading(false));
+    }, [filter, history]);
 
     const act = async (id, kind, body) => {
         setError("");
@@ -316,15 +360,21 @@ export default function AdminAppointment() {
                 method: "POST",
                 body: JSON.stringify(body || {}),
             });
-            setItems((l) => l.map((a) => (a.id === id ? d.appointment : a)));
+            const next = d.appointment;
+            if (FINISHED.includes(next.state)) {
+                // lumipat na sa History
+                setItems((l) => l.filter((a) => a.id !== id));
+                setHistoryCount((c) => c + 1);
+                setHistory(null); // ire-refresh sa susunod na buksan
+            } else {
+                setItems((l) => l.map((a) => (a.id === id ? next : a)));
+            }
         } catch (err) {
             setError(err.message || "Something went wrong.");
         } finally {
             setBusyId(null);
         }
     };
-
-
 
     const toggle = (id) =>
         setOpenIds((prev) => {
@@ -334,19 +384,24 @@ export default function AdminAppointment() {
         });
 
     const counts = useMemo(() => {
-        const c = { all: items.filter((a) => a.state !== "completed" && a.state !== "declined").length };
-        FILTERS.slice(1).forEach(([k]) => (c[k] = items.filter((a) => a.state === k).length));
+        const c = {
+            all: items.filter((a) => !FINISHED.includes(a.state)).length,
+            history: historyCount,
+        };
+        FILTERS.forEach(([k]) => {
+            if (k !== "all" && k !== "history") c[k] = items.filter((a) => a.state === k).length;
+        });
         return c;
-    }, [items]);
+    }, [items, historyCount]);
 
     const visible = useMemo(() => {
         const q = query.trim().toLowerCase();
-        return items.filter((a) => {
-            const byStatus =
-                filter === "all" ? a.state !== "completed" && a.state !== "declined" : a.state === filter;
+        const source = filter === "history" ? history || [] : items;
+        return source.filter((a) => {
+            const byStatus = filter === "all" || filter === "history" || a.state === filter;
             return byStatus && (!q || (a.client_name || "").toLowerCase().includes(q));
         });
-    }, [items, filter, query]);
+    }, [items, history, filter, query]);
 
     const groups = useMemo(() => {
         const today = new Date();
@@ -360,13 +415,21 @@ export default function AdminAppointment() {
                     : d.toDateString() === tomorrow.toDateString()
                         ? "TOMORROW"
                         : d
-                            .toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+                            .toLocaleDateString("en-US", {
+                                weekday: "long",
+                                month: "long",
+                                day: "numeric",
+                                year: filter === "history" ? "numeric" : undefined,
+                            })
                             .toUpperCase();
             if (!map.has(a.date)) map.set(a.date, { label, items: [] });
             map.get(a.date).items.push(a);
         });
-        return [...map.entries()].sort(([x], [y]) => (x < y ? -1 : 1)).map(([, g]) => g);
-    }, [visible]);
+        const dir = filter === "history" ? -1 : 1; // History: pinakabago muna
+        return [...map.entries()].sort(([x], [y]) => (x < y ? -dir : dir)).map(([, g]) => g);
+    }, [visible, filter]);
+
+    const busyLoading = loading || (filter === "history" && historyLoading);
 
     return (
         <div className="flex min-h-screen w-full bg-[#f2f2f2] antialiased">
@@ -407,7 +470,7 @@ export default function AdminAppointment() {
                                 className={`h-[84px] cursor-pointer rounded-tl-[18px] rounded-tr-[7px] rounded-br-[18px] rounded-bl-[7px] border border-[#2020203d] px-[19px] pt-[9px] text-left transition-colors ${active ? "bg-[#4a9b8e78]" : "bg-white hover:bg-[#4a9b8e22]"
                                     }`}
                             >
-                                <div className={`${serif} text-[24px] font-bold leading-[1.2] text-[#2f4a42]`}>{counts[key]}</div>
+                                <div className={`${serif} text-[24px] font-bold leading-[1.2] text-[#2f4a42]`}>{counts[key] ?? 0}</div>
                                 <div className={`${serif} text-[14px] font-bold leading-[1.1] text-[#2f4a42]`}>{label}</div>
                             </button>
                         );
@@ -437,7 +500,7 @@ export default function AdminAppointment() {
 
                 {/* Day groups */}
                 <div className="mt-[26px]">
-                    {loading && <p className={`${serif} text-sm text-[#666]`}>Loading appointments…</p>}
+                    {busyLoading && <p className={`${serif} text-sm text-[#666]`}>Loading appointments…</p>}
 
                     {groups.map((g) => (
                         <section key={g.label} className="mb-[8px]">
@@ -460,11 +523,15 @@ export default function AdminAppointment() {
                         </section>
                     ))}
 
-                    {!loading && visible.length === 0 && (
+                    {!busyLoading && visible.length === 0 && (
                         <div className={`${serif} rounded-[10px] border border-[#c7b6b6] bg-white px-[28px] py-[56px] text-center text-[14px] text-[#666]`}>
-                            {items.length === 0
-                                ? "No appointments yet. They appear here once a client has paid."
-                                : "No appointments match. Try another status or clear the search."}
+                            {filter === "history"
+                                ? query
+                                    ? "No history matches your search."
+                                    : "No history yet. Completed, declined, and cancelled appointments will show up here."
+                                : items.length === 0
+                                    ? "No appointments yet. They appear here once a client has paid."
+                                    : "No appointments match. Try another status or clear the search."}
                         </div>
                     )}
                 </div>

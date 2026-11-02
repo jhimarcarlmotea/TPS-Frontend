@@ -290,6 +290,7 @@ export default function DateTime() {
     setSlot(null);
     setDay(null);
     setError("");
+    setAvailableDays(new Set());
     const d = new Date(year, month + delta, 1);
     setYear(d.getFullYear());
     setMonth(d.getMonth());
@@ -315,43 +316,12 @@ export default function DateTime() {
       providerId: h.provider_id,
     });
 
-  // Pagpili ng oras
-  const selectTime = async (s) => {
-    if (holding) return;
+  // Pagpili ng oras: wala pang hold dito. Magho-hold lang pag pinindot ang Continue.
+  const selectTime = (s) => {
+    if (holding || slot?.start === s.start_time) return;
     setError("");
-
-    // Schedule-first: wala pang psychologist, kaya hindi pa nagho-hold dito.
-    // Magho-hold pagpili ng psychologist sa step 2.
-    if (sFirst) {
-      if (booking.holdId) releaseHold();
-      setSlot({ start: s.start_time, end: s.end_time });
-      return;
-    }
-
-    setHolding(true);
-    try {
-      const d = await apiFetch("/booking/hold", {
-        method: "POST",
-        body: JSON.stringify({
-          service: serviceId,
-          psychologist_id: isPsycho ? psychId : null,
-          // ABA / Assessment reschedule: same provider
-          ...(isResched && !isPsycho && reschedule.providerId
-            ? { provider_id: reschedule.providerId }
-            : {}),
-          date: ymd(year, month, day),
-          start_time: s.start_time,
-        }),
-      });
-      setSlot({ start: d.hold.start_time, end: d.hold.end_time });
-      saveHold(d.hold);
-    } catch (err) {
-      handleErr(err, "Could not hold that time.");
-      setSlot(null);
-      setSlots((prev) => prev.filter((p) => p.start_time !== s.start_time));
-    } finally {
-      setHolding(false);
-    }
+    if (booking.holdId) releaseHold(); // may naunang hold sa ibang oras
+    setSlot({ start: s.start_time, end: s.end_time });
   };
 
   // Psychologist-first, step 1
@@ -363,61 +333,76 @@ export default function DateTime() {
     setError("");
   };
 
-  // Schedule-first, step 2: pumili ng psychologist para sa napiling oras (dito nagho-hold)
-  const pickPsychForSlot = async (p) => {
-    if (holding || !day || !slot) return;
+  // Schedule-first, step 2: pipili lang ng psychologist. Wala pang hold.
+  const pickPsychForSlot = (p) => {
+    if (holding || !day || !slot || p.id === psychId) return;
     setError("");
-    setHolding(true);
-    try {
-      const d = await apiFetch("/booking/hold", {
-        method: "POST",
-        body: JSON.stringify({
-          service: serviceId,
-          psychologist_id: p.id,
-          date: ymd(year, month, day),
-          start_time: slot.start,
-        }),
-      });
-      saveHold(d.hold, p);
-    } catch (err) {
-      handleErr(err, "Could not hold that time.");
-      setPsychList((prev) => prev.filter((x) => x.id !== p.id));
-    } finally {
-      setHolding(false);
+    releaseHold({ psychologistId: p.id, psychologist: p });
+  };
+
+  // DITO nagsisimula ang 1-hour hold (sa Continue lang tinatawag)
+  const createHold = async () => {
+    const d = await apiFetch("/booking/hold", {
+      method: "POST",
+      body: JSON.stringify({
+        service: serviceId,
+        psychologist_id: isPsycho ? psychId : null,
+        // ABA / Assessment reschedule: same provider
+        ...(isResched && !isPsycho && reschedule.providerId
+          ? { provider_id: reschedule.providerId }
+          : {}),
+        date: ymd(year, month, day),
+        start_time: slot.start,
+      }),
+    });
+    saveHold(d.hold, sFirst ? booking.psychologist : null);
+    return d.hold;
+  };
+
+  // Kapag may nakaabot na ng slot bago siya (409 galing server)
+  const onHoldFail = (err) => {
+    handleErr(err, "Sorry, that time was just taken. Please pick another.");
+    if (sFirst) {
+      setPsychList((prev) => prev.filter((x) => x.id !== psychId));
+      update({ psychologistId: null, psychologist: null });
+    } else {
+      setSlots((prev) => prev.filter((p) => p.start_time !== slot?.start));
+      setSlot(null);
     }
   };
 
   // ---------- navigation ----------
   let canContinue = false;
   if (!serviceId) canContinue = false;
-  else if (!isPsycho) canContinue = !!day && !!slot && holdActive;
-  else if (isResched) canContinue = !!day && !!slot && holdActive;
+  else if (!isPsycho) canContinue = !!day && !!slot;
+  else if (isResched) canContinue = !!day && !!slot;
   else if (pFirst && step === 1) canContinue = !!psychId;
-  else if (pFirst && step === 2) canContinue = !!day && !!slot && holdActive;
+  else if (pFirst && step === 2) canContinue = !!day && !!slot;
   else if (sFirst && step === 1) canContinue = !!day && !!slot;
-  else canContinue = holdActive && !!psychId;
+  else canContinue = !!day && !!slot && !!psychId;
 
-  // Reschedule: palitan lang ang date at oras ng existing appointment
+  // Reschedule: mag-hold muna, tapos palitan ang date at oras ng existing appointment
   const confirmReschedule = async () => {
     setError("");
     setHolding(true);
     try {
+      const h = await createHold();
       const d = await apiFetch(`/my-appointments/${reschedule.id}/reschedule`, {
         method: "POST",
-        body: JSON.stringify({ hold_id: booking.holdId }),
+        body: JSON.stringify({ hold_id: h.id }),
       });
       update({ ...CLEAR_HOLD });
       navigate("/book/confirmation", {
         state: { rescheduled: true, appointment: d.appointment },
       });
     } catch (err) {
-      handleErr(err, "Could not reschedule this appointment.");
+      onHoldFail(err);
     } finally {
       setHolding(false);
     }
   };
 
-  const goNext = () => {
+  const goNext = async () => {
     if (!canContinue || holding) return;
     setError("");
     if (isResched) {
@@ -427,6 +412,28 @@ export default function DateTime() {
     if (isPsycho && step === 1) {
       setStep(2);
       return;
+    }
+
+    // Final step: dito magsisimula ang 1-hr hold.
+    // Kung bumalik lang siya galing /book/info at pareho pa rin ang pinili, huwag nang mag-hold ulit.
+    const sameHold =
+      holdActive &&
+      booking.timeStart === slot.start &&
+      booking.date?.year === year &&
+      booking.date?.month === month &&
+      booking.date?.day === day &&
+      (!isPsycho || booking.psychologistId === psychId);
+
+    if (!sameHold) {
+      setHolding(true);
+      try {
+        await createHold();
+      } catch (err) {
+        onHoldFail(err);
+        setHolding(false);
+        return;
+      }
+      setHolding(false);
     }
     navigate("/book/info");
   };
@@ -605,17 +612,15 @@ export default function DateTime() {
                         <PsychCard
                           p={p}
                           disabled={holding}
-                          selected={
-                            pFirst ? psychId === p.id : holdActive && psychId === p.id
-                          }
+                          selected={psychId === p.id}
                           onClick={() => (pFirst ? pickPsychFirst(p) : pickPsychForSlot(p))}
                         />
                       </li>
                     ))}
                   </ul>
-                  {sFirst && holdActive && (
+                  {sFirst && psychId && (
                     <p className="mt-4 mb-0 text-xs text-[#666]">
-                      This time is held for you while you complete your booking.
+                      Your time will be held for 1 hour once you click Continue.
                     </p>
                   )}
                 </div>
@@ -748,7 +753,7 @@ export default function DateTime() {
                             )}
                             {slot && !sFirst && (
                               <p className="mt-4 mb-0 text-xs text-[#666]">
-                                This time is held for you while you complete your booking.
+                                Your time will be held for 1 hour once you click Continue.
                               </p>
                             )}
                           </>
@@ -775,7 +780,7 @@ export default function DateTime() {
                   disabled={!canContinue || holding}
                   onClick={goNext}
                 >
-                  {isResched ? (holding ? "Please wait…" : "Confirm reschedule") : "Continue"}
+                  {isResched ? (holding ? "Please wait…" : "Confirm reschedule") : holding ? "Please wait…" : "Continue"}
                 </button>
               </div>
             </Reveal>

@@ -16,6 +16,11 @@ const panelClass =
 
 const POLL_MS = 8000;
 
+// Route ng ReviewAndPay.jsx (Review & payment). PALITAN kung iba ang path sa router mo.
+const PAYMENT_PATH = "/book/review";
+
+const ROLE_LABEL = { ADMIN: "Admin", AFFILIATE: "Affiliate" };
+
 const STAGES = [
   {
     id: "payment_pending",
@@ -54,6 +59,8 @@ export default function Approval() {
   const [pay, setPay] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState("");
 
   // Wala nang back: hinaharang ang browser back button
   useEffect(() => {
@@ -129,6 +136,56 @@ export default function Approval() {
 
   const rejectedByPayment = pay?.rejected_by === "payment";
   const needsConsent = !pay || pay.service_id === "psychotherapy";
+
+  // Payment na-reject: hindi pwedeng mag-continue, "Back to payment" lang
+  const paymentRejected = status === "rejected" && rejectedByPayment;
+  const reviewerLabel = pay?.reviewer
+    ? `${pay.reviewer}${pay.reviewer_role ? ` (${ROLE_LABEL[pay.reviewer_role] || pay.reviewer_role})` : ""}`
+    : "the clinic";
+
+  // Ire-reserve ulit ang parehong oras, tapos balik sa payment step
+  const backToPayment = async () => {
+    if (retrying || !pay) return;
+    setRetrying(true);
+    setRetryError("");
+    try {
+      const d = await apiFetch(`/booking/payments/${pay.id}/retry`, { method: "POST" });
+      const h = d.hold;
+      const [y, m, day] = h.date.split("-").map(Number);
+
+      update({
+        serviceId: d.service_id,
+        psychologistId: d.psychologist?.id ?? null,
+        psychologist: d.psychologist ?? null,
+        date: { year: y, month: m - 1, day },
+        time: to12(h.start_time),
+        timeStart: h.start_time,
+        timeEnd: h.end_time,
+        holdId: h.id,
+        holdExpiresAt: h.expires_at,
+        providerId: h.provider_id,
+        approvalStatus: null,
+        referenceNumber: null,
+        paymentId: null,
+        // Ibalik sa payment form ang mga isinulat ng client dati
+        paymentDraft: {
+          type: d.previous?.type ?? null,
+          method_name: d.previous?.method_name ?? null,
+          wallet_number: d.previous?.wallet_number ?? "",
+          reference_number: d.previous?.reference_number ?? "",
+          reason: d.previous?.reason ?? null,
+          reviewer: d.previous?.reviewer ?? null,
+        },
+      });
+      navigate(PAYMENT_PATH, { replace: true });
+    } catch (err) {
+      if (err.message?.includes("session expired")) return navigate("/signin");
+      setRetryError(err.message || "Could not go back to payment. Please try again.");
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   return (
     <div className={pageShell}>
       <Navbar />
@@ -203,7 +260,8 @@ export default function Approval() {
                   {rejectedByPayment
                     ? "We could not verify your payment."
                     : "Your psychologist could not accept this request."}
-                  {pay?.reason && <> Reason: {pay.reason}</>} Please contact the clinic or book again.
+                  {pay?.reason && <> Reason: {pay.reason}</>}{" "}
+                  {rejectedByPayment ? "Please go back to payment and submit it again." : "Please contact the clinic or book again."}
                 </div>
               )}
 
@@ -241,9 +299,18 @@ export default function Approval() {
                     (needsConsent
                       ? "Next step: complete the consent and intake forms before your session."
                       : "Your appointment is confirmed. You may continue.")}
-                  {status === "rejected" && "You may return home or message the clinic for assistance."}
+                  {status === "rejected" &&
+                    (rejectedByPayment
+                      ? "Go back to payment to send your payment details again."
+                      : "You may return home or message the clinic for assistance.")}
                 </p>
               </div>
+
+              {retryError && !paymentRejected && (
+                <p className="mt-4 mb-0 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  {retryError}
+                </p>
+              )}
 
               <div className="mt-8 flex flex-wrap items-center justify-end gap-4 border-t border-dashed border-[#d0e5dd] pt-5">
                 {status === "approved" ? (
@@ -253,6 +320,15 @@ export default function Approval() {
                     onClick={() => navigate(needsConsent ? "/book/consent" : "/book/confirmation")}
                   >
                     {needsConsent ? "Continue to consent form" : "Continue"}
+                  </button>
+                ) : paymentRejected ? (
+                  <button
+                    type="button"
+                    className={`${btnSolid} disabled:opacity-55 disabled:cursor-not-allowed`}
+                    disabled={retrying}
+                    onClick={backToPayment}
+                  >
+                    {retrying ? "Please wait…" : "Back to payment"}
                   </button>
                 ) : status === "rejected" ? (
                   <Link to="/" className={btnSolid}>
@@ -279,6 +355,59 @@ export default function Approval() {
         </div>
       </main>
       <Footer />
+
+      {/* Pop-up: message galing kay admin / affiliate kapag na-reject ang payment */}
+      {paymentRejected && (
+        <div
+          className="fixed inset-0 z-[100] grid place-items-center bg-black/45 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pay-rejected-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-red-100 text-lg font-bold text-red-700">
+                !
+              </span>
+              <h3 id="pay-rejected-title" className="m-0 font-serif text-xl text-[#202020]">
+                Payment not verified
+              </h3>
+            </div>
+
+            <p className="mt-4 mb-1 text-xs font-bold tracking-[0.08em] text-[#666]">
+              MESSAGE FROM {reviewerLabel.toUpperCase()}
+            </p>
+            <blockquote className="m-0 rounded-lg border-l-4 border-red-300 bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-900">
+              {pay?.reason || "We could not verify your payment."}
+            </blockquote>
+
+            <p className="mt-4 mb-0 text-sm text-[#555]">
+              Please go back to payment and send your details again. We will try to reserve your
+              selected time again.
+            </p>
+
+            {retryError && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                {retryError}{" "}
+                <Link to="/book" className="font-bold text-tf-teal underline">
+                  Book a new schedule
+                </Link>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                className={`${btnSolid} disabled:opacity-55 disabled:cursor-not-allowed`}
+                disabled={retrying}
+                onClick={backToPayment}
+              >
+                {retrying ? "Please wait…" : "Back to payment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
