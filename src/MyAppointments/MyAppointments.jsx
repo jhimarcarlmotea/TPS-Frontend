@@ -11,6 +11,7 @@ import {
 } from "../components/Layout";
 import { apiFetch } from "../auth";
 import { to12 } from "../components/payUtils";
+import VideoCall from "../components/VideoCall"; // <-- IMPORT NG VIDEO CALL
 
 const MESSAGES = {
   Confirmed: "Your appointment is confirmed. We look forward to seeing you.",
@@ -23,7 +24,6 @@ const MESSAGES = {
   Expired: "This appointment was not approved before its schedule.",
 };
 
-// API row -> hugis na ginagamit ng UI
 const toItem = (a) => {
   const start = new Date(`${a.date}T${a.start_time}:00`);
   const upcoming = a.tab === "upcoming";
@@ -165,16 +165,19 @@ export default function MyAppointments() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [dialog, setDialog] = useState(null); // { type: "cancel" | "reschedule", id }
+  const [dialog, setDialog] = useState(null);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState("");
   const [detailsId, setDetailsId] = useState(null);
+  
+  // State para sa Video Call
+  const [inCall, setInCall] = useState(false);
+  const [callChannel, setCallChannel] = useState("");
 
   const load = () =>
     apiFetch("/my-appointments")
       .then((d) => {
         const list = (d.appointments || []).map(toItem);
-        // upcoming: pinakamalapit muna; ang iba: pinakabago muna (galing sa backend)
         const up = list
           .filter((a) => a.tab === "upcoming")
           .sort((a, b) => a.target - b.target);
@@ -213,7 +216,6 @@ export default function MyAppointments() {
     const item = items.find((a) => a.id === dialog.id);
     if (!item) return closeDialog();
 
-    // Reschedule: pumunta sa pagpili ng bagong date at time
     if (dialog.type === "reschedule") {
       const a = item.raw;
       navigate("/book/date-time", {
@@ -231,7 +233,6 @@ export default function MyAppointments() {
       return;
     }
 
-    // Cancel
     setBusy(true);
     setDialogError("");
     try {
@@ -354,6 +355,18 @@ export default function MyAppointments() {
                     </div>
                     <div className="flex flex-col items-center gap-4 md:items-end">
                       <Countdown target={next.target} />
+                      
+                      {/* VIDEO CALL BUTTON PARA SA NEXT SESSION */}
+                      <button
+                        onClick={() => {
+                          setCallChannel(`appointment-${next.id}`);
+                          setInCall(true);
+                        }}
+                        className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-lg shadow transition"
+                      >
+                        Join Video Call
+                      </button>
+
                       {next.canChange && (
                         <div className="flex gap-4">
                           <button
@@ -514,6 +527,14 @@ export default function MyAppointments() {
         </div>
       </main>
       <Footer />
+
+      {/* KAPAG PININDOT ANG VIDEO CALL BUTTON, LALABAS ITO */}
+      {inCall && (
+        <VideoCall 
+          channelName={callChannel} 
+          onLeave={() => setInCall(false)} 
+        />
+      )}
 
       {dialog && (
         <Dialog

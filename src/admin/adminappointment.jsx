@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminNavigation from "./adminnavigation";
 import ConsentViewer from "../components/ConsentViewer";
+import VideoCall from "../components/VideoCall"; // <-- IMPORT NG VIDEO CALL
 import { apiFetch } from "../auth";
 import { peso, to12 } from "../components/payUtils";
 
@@ -126,7 +127,6 @@ const Stepper = ({ steps }) => (
     </div>
 );
 
-// Placeholder lang: wala pang integration ang messaging
 const MessageBtn = () => (
     <button
         type="button"
@@ -172,15 +172,13 @@ const StatusChip = ({ s, className = "" }) => (
     </span>
 );
 
-const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVerify, onViewConsent }) => {
+const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVerify, onViewConsent, onJoinCall }) => {
     const s = STATUS[a.state] || STATUS.pending;
     const d = new Date(a.date + "T00:00");
 
     return (
         <article className="rounded-[10px] border border-[#c7b6b6] bg-white px-[16px] pb-[16px] pt-[16px] sm:px-[24px] sm:pt-[20px]">
-            {/* Mobile/tablet: date + info (+ chip) tapos stepper sa sariling row. xl pataas: isang row lang */}
             <div className="flex flex-wrap items-center gap-x-[16px] gap-y-[16px] xl:flex-nowrap xl:gap-x-0">
-                {/* date block */}
                 <div className={`${serif} flex h-[68px] w-[62px] shrink-0 flex-col items-center justify-center rounded-[6px] bg-[#a9d0c8] leading-[1.15] text-[#1f4d3f]`}>
                     <span className="text-[17px] font-bold">{d.getDate()}</span>
                     <span className="text-[10px]">{d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}</span>
@@ -194,7 +192,6 @@ const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVer
                         <ConsentChip status={a.consent_status} />
                     </div>
 
-                    {/* Detalye ng history */}
                     {a.state === "completed" && a.completed_at && (
                         <div className={`${serif} mt-[2px] text-[12px] text-[#666]`}>Completed on {fmtStamp(a.completed_at)}</div>
                     )}
@@ -205,13 +202,10 @@ const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVer
                         <div className={`${serif} mt-[2px] text-[12px] text-[#666]`}>Reason: {a.decline_reason}</div>
                     )}
 
-                    {/* chip dito sa mobile/tablet */}
                     <StatusChip s={s} className="mt-[8px] inline-flex xl:hidden" />
                 </div>
 
                 <Stepper steps={s.steps} />
-
-                {/* chip sa gilid sa xl pataas */}
                 <StatusChip s={s} className="ml-[40px] hidden w-[118px] xl:flex" />
             </div>
 
@@ -230,7 +224,7 @@ const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVer
                     )}
                 </button>
 
-                <div className="flex items-center gap-[8px]">
+                <div className="flex flex-wrap items-center gap-[8px]">
                     {a.consent_status === "submitted" && (
                         <button
                             type="button"
@@ -241,6 +235,18 @@ const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVer
                         </button>
                     )}
                     <MessageBtn />
+                    
+                    {/* VIDEO CALL BUTTON PARA SA ADMIN - LALABAS KAPAG APPROVED */}
+                    {a.state === "approved" && (
+                        <button
+                            type="button"
+                            onClick={() => onJoinCall(a.id)}
+                            className={`${serif} h-[26px] cursor-pointer rounded-[5px] border-0 bg-[#2f4a42] px-[12px] text-[11px] text-white hover:bg-[#20352f]`}
+                        >
+                            Join Video Call
+                        </button>
+                    )}
+
                     {a.state === "verify" && <PrimaryBtn onClick={onVerify}>Verify payment</PrimaryBtn>}
                     {a.state === "pending" && (
                         <PrimaryBtn disabled={busy} onClick={onApprove}>
@@ -321,7 +327,7 @@ export default function AdminAppointment() {
     const navigate = useNavigate();
     const [navOpen, setNavOpen] = useState(false);
     const [items, setItems] = useState([]);
-    const [history, setHistory] = useState(null); // null = hindi pa na-load
+    const [history, setHistory] = useState(null);
     const [historyCount, setHistoryCount] = useState(0);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -331,6 +337,10 @@ export default function AdminAppointment() {
     const [openIds, setOpenIds] = useState(() => new Set());
     const [busyId, setBusyId] = useState(null);
     const [viewing, setViewing] = useState(null);
+
+    // State para sa Video Call
+    const [inCall, setInCall] = useState(false);
+    const [callChannel, setCallChannel] = useState("");
 
     useEffect(() => {
         apiFetch(`${API_BASE}/appointments`)
@@ -342,7 +352,6 @@ export default function AdminAppointment() {
             .finally(() => setLoading(false));
     }, []);
 
-    // Kunin ang history kapag binuksan ang History tab (isang beses lang)
     useEffect(() => {
         if (filter !== "history" || history !== null) return;
         setHistoryLoading(true);
@@ -362,10 +371,9 @@ export default function AdminAppointment() {
             });
             const next = d.appointment;
             if (FINISHED.includes(next.state)) {
-                // lumipat na sa History
                 setItems((l) => l.filter((a) => a.id !== id));
                 setHistoryCount((c) => c + 1);
-                setHistory(null); // ire-refresh sa susunod na buksan
+                setHistory(null);
             } else {
                 setItems((l) => l.map((a) => (a.id === id ? next : a)));
             }
@@ -425,22 +433,25 @@ export default function AdminAppointment() {
             if (!map.has(a.date)) map.set(a.date, { label, items: [] });
             map.get(a.date).items.push(a);
         });
-        const dir = filter === "history" ? -1 : 1; // History: pinakabago muna
+        const dir = filter === "history" ? -1 : 1;
         return [...map.entries()].sort(([x], [y]) => (x < y ? -dir : dir)).map(([, g]) => g);
     }, [visible, filter]);
 
     const busyLoading = loading || (filter === "history" && historyLoading);
 
+    const handleJoinCall = (id) => {
+        setCallChannel(`appointment-${id}`);
+        setInCall(true);
+    };
+
     return (
         <div className="flex min-h-screen w-full bg-[#f2f2f2] antialiased">
             <style>{FONT_CSS}</style>
 
-            {/* Sidebar: laging nakikita sa lg pataas */}
             <div className="hidden lg:block">
                 <AdminNavigation />
             </div>
 
-            {/* Sidebar: drawer sa mobile/tablet */}
             {navOpen && (
                 <div className="fixed inset-0 z-50 flex lg:hidden">
                     <div className="h-full overflow-y-auto bg-white">
@@ -457,7 +468,6 @@ export default function AdminAppointment() {
             <main className="min-w-0 flex-1 px-[16px] pb-[48px] pt-[20px] sm:px-[28px] sm:pt-[32px] lg:px-[36px] lg:pb-[60px] lg:pt-[51px]">
                 <Header onMenu={() => setNavOpen(true)} />
 
-                {/* Status filters */}
                 <div className="mt-[28px] grid grid-cols-2 gap-[12px] sm:mt-[40px] sm:grid-cols-3 xl:mt-[56px] xl:grid-cols-5 xl:gap-[27px]">
                     {FILTERS.map(([key, label]) => {
                         const active = filter === key;
@@ -477,7 +487,6 @@ export default function AdminAppointment() {
                     })}
                 </div>
 
-                {/* Search */}
                 <label className="relative mt-[22px] block w-full sm:mt-[26px] sm:w-[286px]">
                     <span className="sr-only">Search people</span>
                     <svg className="absolute left-[15px] top-[8px]" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2" strokeLinecap="round">
@@ -498,7 +507,6 @@ export default function AdminAppointment() {
                     </p>
                 )}
 
-                {/* Day groups */}
                 <div className="mt-[26px]">
                     {busyLoading && <p className={`${serif} text-sm text-[#666]`}>Loading appointments…</p>}
 
@@ -517,6 +525,7 @@ export default function AdminAppointment() {
                                         onComplete={() => act(a.id, "complete")}
                                         onVerify={() => navigate(PAYMENT_PATH)}
                                         onViewConsent={() => setViewing(a)}
+                                        onJoinCall={handleJoinCall} // <-- IPINASA ANG FUNCTION
                                     />
                                 ))}
                             </div>
@@ -538,6 +547,14 @@ export default function AdminAppointment() {
             </main>
 
             {viewing && <ConsentViewer base={API_BASE} appointment={viewing} onClose={() => setViewing(null)} />}
+
+            {/* KAPAG PININDOT ANG VIDEO CALL BUTTON NG ADMIN, LALABAS ITO */}
+            {inCall && (
+                <VideoCall 
+                    channelName={callChannel} 
+                    onLeave={() => setInCall(false)} 
+                />
+            )}
         </div>
     );
 }
