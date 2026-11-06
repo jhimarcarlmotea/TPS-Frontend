@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Navbar, Footer, Reveal, SectionHead, Photo, btnSolid } from "../components/Layout";
 import { CLINIC } from "../data/clinic";
+import { useHomeContent } from "../data/useHomecontent";
+import TherapistProfileModal from "../components/TherapistProfileModal";
 
 const ICONS = {
   select: <><rect x="14" y="10" width="36" height="46" rx="5" /><path d="M24 24h16M24 34h16M24 44h10" /></>,
@@ -239,7 +241,8 @@ function ChipAvatar() {
 }
 
 /* ---------- Sections ---------- */
-function Hero() {
+function Hero({ data }) {
+  const h = data || {};
   return (
     <section
       id="top"
@@ -252,22 +255,24 @@ function Hero() {
       <div className={`${containerClass} relative z-10 py-20`}>
         <div className="max-w-[540px]">
           <p className={`font-serif text-sm tracking-[0.08em] text-[#5a615d] mb-3 ${riseBase} [animation-delay:0.05s]`}>
-            A SAFE SPACE FOR WELL-BEING
+            {h.eyebrow || "A SAFE SPACE FOR WELL-BEING"}
           </p>
           <h1 className={`font-serif font-normal text-[clamp(36px,4.5vw,54px)] leading-[1.12] my-3.5 text-[#111] ${riseBase} [animation-delay:0.15s]`}>
-            Professional support for every step of <em className="not-italic font-bold text-tf-green">your journey</em>.
+            {h.headline || "Professional support for every step of"}{" "}
+            <em className="not-italic font-bold text-tf-green">
+              {h.highlight || "your journey"}
+            </em>.
           </h1>
           <p className={`font-serif text-lg leading-[1.55] max-w-[460px] text-[#333] ${riseBase} [animation-delay:0.3s]`}>
-            Access compassionate mental health services, professional counseling, therapy, and
-            assessment consultation in a safe and supportive environment.
+            {h.subtext || "Access compassionate mental health services, professional counseling, therapy, and assessment consultation in a safe and supportive environment."}
           </p>
           <div className={`flex items-center flex-wrap gap-6 mt-9 ${riseBase} [animation-delay:0.45s]`}>
-            <Link to="/book" className={btnSolidLg}>Book an Appointment</Link>
+            <Link to="/book" className={btnSolidLg}>{h.ctaLabel || "Book an Appointment"}</Link>
             <a
               href="#how"
               className="font-serif text-[15px] text-black/70 border-b border-transparent no-underline transition-[border-color,color] duration-[250ms] hover:text-black hover:border-current"
             >
-              Learn how it works
+              {h.linkLabel || "Learn how it works"}
             </a>
           </div>
         </div>
@@ -276,7 +281,8 @@ function Hero() {
   );
 }
 
-function HowItWorks() {
+function HowItWorks({ items }) {
+  const steps = items && items.length > 0 ? items : STEPS;
   const treeImgClass =
     "absolute bottom-0 right-0 w-full origin-bottom-right -translate-y-[30%] animate-[tf-sway_9s_ease-in-out_infinite_alternate] motion-reduce:animate-none";
 
@@ -298,7 +304,7 @@ function HowItWorks() {
           />
         </Reveal>
         <ol className="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-6 mt-12 relative z-10 list-none m-0 p-0">
-          {STEPS.map((s, i) => (
+          {steps.map((s, i) => (
             <li key={s.title} className="m-0 p-0">
               <Reveal delay={i * 90} className="h-full">
                 <article className="relative h-full bg-white rounded-2xl px-6 pt-10 pb-8 text-center flex flex-col items-center gap-4 border border-black/5 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.08)] transition-[transform,box-shadow] duration-[350ms] ease-tf hover:-translate-y-[5px] hover:shadow-[0_18px_34px_-20px_rgba(32,62,67,0.45)]">
@@ -318,7 +324,8 @@ function HowItWorks() {
   );
 }
 
-function Services() {
+function Services({ items }) {
+  const list = items && items.length > 0 ? items : SERVICES;
   return (
     <section className={`${sectionClass} bg-white overflow-hidden`} id="services">
       <Dots className="top-[5%] left-[6%] w-16 h-16" />
@@ -333,7 +340,7 @@ function Services() {
             sub="Focused care tailored to your unique journey toward clarity and growth."
           />
         </Reveal>
-        {SERVICES.map((s, i) => {
+        {list.map((s, i) => {
           const flip = i % 2 === 1;
           return (
             <Reveal
@@ -375,9 +382,11 @@ function Services() {
   );
 }
 
-function Team() {
+function Team({ items, onSelectProfile }) {
+  const list = items && items.length > 0 ? items : TEAM;
   const [i, setI] = useState(0);
-  const p = TEAM[i];
+  const activeIdx = Math.min(i, list.length - 1);
+  const p = list[activeIdx] || list[0];
   return (
     <section className={`${sectionClass} bg-tf-mint overflow-hidden`} id="about">
       <HeadHeart className="top-[3%] right-[3%] w-[260px] h-[260px] opacity-80" />
@@ -405,8 +414,8 @@ function Team() {
 
           <div>
             <div className="flex flex-wrap gap-3.5" role="tablist" aria-label="Team members">
-              {TEAM.map((t, idx) => {
-                const active = idx === i;
+              {list.map((t, idx) => {
+                const active = idx === activeIdx;
                 return (
                   <button
                     key={idx}
@@ -431,25 +440,41 @@ function Team() {
 
             <div
               className="mt-10 animate-[tf-fade-slide_0.55s_var(--ease-tf)] motion-reduce:animate-none"
-              key={i}
+              key={activeIdx}
             >
-              <p className="m-0 text-[13px] font-bold tracking-[0.1em] text-tf-teal">{p.role.toUpperCase()}</p>
+              <p className="m-0 text-[13px] font-bold tracking-[0.1em] text-tf-teal">{(p.role || "THERAPIST").toUpperCase()}</p>
               <h3 className="m-0 text-tf-teal font-normal text-[clamp(28px,3.4vw,36px)] my-2 font-serif">{p.name}</h3>
-              <blockquote className="m-0 font-serif font-bold text-tf-ink text-[22px] leading-[1.3] max-w-[480px] border-l-[3px] border-tf-teal pl-4">
-                {p.quote}
-              </blockquote>
+              {p.quote && (
+                <blockquote className="m-0 font-serif font-bold text-tf-ink text-[22px] leading-[1.3] max-w-[480px] border-l-[3px] border-tf-teal pl-4">
+                  {p.quote}
+                </blockquote>
+              )}
               <p className="m-0 my-6 max-w-[500px] text-base leading-[1.7] text-tf-body">{p.bio}</p>
-              <p className="m-0 text-[13px] font-bold tracking-[0.1em] text-tf-teal">WORKS WITH</p>
-              <ul className="flex flex-wrap gap-2.5 mt-3 mb-0 mx-0 list-none p-0">
-                {p.tags.map((t) => (
-                  <li
-                    key={t}
-                    className="font-serif font-bold text-xs text-[rgba(26,35,50,0.7)] bg-[rgba(74,155,142,0.15)] py-1.5 px-4 rounded-xl"
-                  >
-                    {t}
-                  </li>
-                ))}
-              </ul>
+              {p.tags && p.tags.length > 0 && (
+                <>
+                  <p className="m-0 text-[13px] font-bold tracking-[0.1em] text-tf-teal">WORKS WITH</p>
+                  <ul className="flex flex-wrap gap-2.5 mt-3 mb-0 mx-0 list-none p-0">
+                    {p.tags.map((t) => (
+                      <li
+                        key={t}
+                        className="font-serif font-bold text-xs text-[rgba(26,35,50,0.7)] bg-[rgba(74,155,142,0.15)] py-1.5 px-4 rounded-xl"
+                      >
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              <div className="mt-7">
+                <button
+                  type="button"
+                  onClick={() => onSelectProfile && onSelectProfile(p)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-tf-navy px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition cursor-pointer"
+                >
+                  View {p.name}'s Profile →
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -458,10 +483,12 @@ function Team() {
   );
 }
 
-function Stories() {
+function Stories({ items }) {
+  const list = items && items.length > 0 ? items : STORIES;
   const [i, setI] = useState(0);
-  const go = (d) => setI((x) => (x + d + STORIES.length) % STORIES.length);
-  const s = STORIES[i];
+  const go = (d) => setI((x) => (x + d + list.length) % list.length);
+  const activeIdx = Math.min(i, list.length - 1);
+  const s = list[activeIdx] || list[0];
   return (
     <section className={`${sectionClass} bg-tf-mint overflow-hidden`}>
       <Vine className="bottom-[-4%] left-[1%] w-[110px] h-[330px]" />
@@ -479,7 +506,7 @@ function Stories() {
         </Reveal>
         <figure
           className="m-0 mt-12 animate-[tf-fade-slide_0.6s_var(--ease-tf)] motion-reduce:animate-none flex flex-col items-center"
-          key={i}
+          key={activeIdx}
           aria-live="polite"
         >
           <blockquote className="m-0 font-serif font-bold text-tf-ink text-[clamp(24px,3.2vw,36px)] leading-[1.4] max-w-[800px]">
@@ -503,7 +530,7 @@ function Stories() {
             ‹
           </button>
           <span>
-            {i + 1} of {STORIES.length}
+            {activeIdx + 1} of {list.length}
           </span>
           <button
             type="button"
@@ -519,7 +546,8 @@ function Stories() {
   );
 }
 
-function FAQ() {
+function FAQ({ items }) {
+  const list = items && items.length > 0 ? items : FAQS;
   const [open, setOpen] = useState(0);
   return (
     <section className={`${sectionClass} bg-white overflow-hidden`} id="faq">
@@ -531,11 +559,11 @@ function FAQ() {
           <SectionHead align="center" eyebrow="FAQ" title="Frequently asked questions" />
         </Reveal>
         <div className="mt-10 grid gap-4">
-          {FAQS.map((f, idx) => {
+          {list.map((f, idx) => {
             const isOpen = open === idx;
             return (
               <div
-                key={f.q}
+                key={f.q || idx}
                 className={`rounded-xl bg-white border shadow-[0_4px_12px_-4px_rgba(0,0,0,0.03)] transition-[border-color,background] duration-300 ${isOpen ? "border-tf-teal" : "border-black/10"
                   }`}
               >
@@ -748,19 +776,29 @@ function ContactInquiry() {
 }
 
 export default function Home() {
+  const content = useHomeContent();
+  const [modalProfile, setModalProfile] = useState(null);
+
   return (
     <div className="font-sans text-black bg-tf-bg overflow-x-hidden antialiased">
       <Navbar />
       <main>
-        <Hero />
-        <HowItWorks />
-        <Services />
-        <Team />
-        <Stories />
-        <FAQ />
-        <ContactInquiry />
+        <Hero data={content?.hero} />
+        <HowItWorks items={content?.steps} />
+        <Services items={content?.services} />
+        <Team items={content?.team} onSelectProfile={setModalProfile} />
+        <Stories items={content?.stories} />
+        <FAQ items={content?.faqs} />
+        <ContactInquiry contact={content?.contact} />
       </main>
       <Footer />
+
+      {modalProfile && (
+        <TherapistProfileModal
+          profile={modalProfile}
+          onClose={() => setModalProfile(null)}
+        />
+      )}
     </div>
   );
 }

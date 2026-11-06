@@ -4,6 +4,7 @@ import { getClientNav } from "./clientnavigation";
 import { logout } from "../auth";
 import { CLINIC } from "../data/clinic";
 import ProfileMenu from "./ProfileMenu";
+import LegalModal from "./LegalModals";
 
 /* ---------- Shared Tailwind helpers ---------- */
 export const container =
@@ -260,6 +261,7 @@ export function Navbar() {
 
 export function Footer() {
   const { nav, authed } = useClientNav();
+  const [legalType, setLegalType] = useState(null);
 
   return (
     <footer className="bg-tf-footer text-white pt-[72px]" id="contact">
@@ -379,18 +381,37 @@ export function Footer() {
         className={`${container} flex flex-wrap justify-between gap-3 mt-14 py-6 border-t border-white/12 font-serif text-xs`}
       >
         <p className="m-0">© 2026 Threefold. All rights reserved. Made with care for mental wellness.</p>
-        <p className="m-0 flex gap-6">
-          <a href="#privacy" className="no-underline text-inherit hover:text-tf-teal">
+        <p className="m-0 flex flex-wrap gap-6">
+          <button
+            type="button"
+            onClick={() => setLegalType("privacy")}
+            className="bg-transparent border-0 p-0 cursor-pointer font-serif text-xs text-inherit hover:text-tf-teal transition"
+          >
             Privacy Policy
-          </a>
-          <a href="#terms" className="no-underline text-inherit hover:text-tf-teal">
+          </button>
+          <button
+            type="button"
+            onClick={() => setLegalType("terms")}
+            className="bg-transparent border-0 p-0 cursor-pointer font-serif text-xs text-inherit hover:text-tf-teal transition"
+          >
             Terms of Service
-          </a>
-          <a href="#cookies" className="no-underline text-inherit hover:text-tf-teal">
+          </button>
+          <button
+            type="button"
+            onClick={() => setLegalType("cookies")}
+            className="bg-transparent border-0 p-0 cursor-pointer font-serif text-xs text-inherit hover:text-tf-teal transition"
+          >
             Cookie Policy
-          </a>
+          </button>
         </p>
       </div>
+
+      {legalType && (
+        <LegalModal
+          type={legalType}
+          onClose={() => setLegalType(null)}
+        />
+      )}
     </footer>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import AdminNavigation from "./adminnavigation";
 import ConsentViewer from "../components/ConsentViewer";
 import VideoCall from "../components/VideoCall"; // <-- IMPORT NG VIDEO CALL
@@ -127,17 +127,16 @@ const Stepper = ({ steps }) => (
     </div>
 );
 
-const MessageBtn = () => (
-    <button
-        type="button"
-        title="Messaging is coming soon"
-        className={`${serif} flex h-[26px] cursor-pointer items-center gap-[6px] rounded-[5px] border border-[#00000024] bg-[#a9d0c8] px-[12px] text-[11px] text-[#202020] hover:bg-[#98c5bc]`}
+const MessageBtn = ({ clientId }) => (
+    <Link
+        to={`/admin/messages?contact_id=${clientId}`}
+        className={`${serif} flex h-[26px] cursor-pointer items-center gap-[6px] rounded-[5px] border border-[#00000024] bg-[#a9d0c8] px-[12px] text-[11px] text-[#202020] hover:bg-[#98c5bc] no-underline`}
     >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#202020" strokeWidth="2" strokeLinejoin="round">
             <path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12Z" />
         </svg>
         Message
-    </button>
+    </Link>
 );
 
 const PrimaryBtn = ({ children, onClick, disabled }) => (

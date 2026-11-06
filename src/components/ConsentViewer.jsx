@@ -138,6 +138,18 @@ export default function ConsentViewer({ base, appointment, onClose }) {
                                             <Row k="Date signed" v={fmtDate(data.signed_date)} />
                                             <Row k="Submitted" v={fmtDate(data.submitted_at, { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })} />
                                         </dl>
+                                        {(data.signature_data || agreements?.signature_data) && (
+                                            <div className="mt-3">
+                                                <p className="m-0 text-xs font-semibold text-[#666]">Drawn Signature:</p>
+                                                <div className="mt-1 inline-block rounded-lg border border-black/15 bg-white p-2">
+                                                    <img
+                                                        src={data.signature_data || agreements?.signature_data}
+                                                        alt="Client digital signature"
+                                                        className="max-h-24 max-w-full object-contain"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
                                     </Block>
                                     {data.is_minor && data.guardian && (
                                         <Block title="PARENT / GUARDIAN (CLIENT IS UNDER 18)">
@@ -145,6 +157,18 @@ export default function ConsentViewer({ base, appointment, onClose }) {
                                                 <Row k="Printed name" v={data.guardian.name} />
                                                 <Row k="Relationship to minor" v={data.guardian.relation} />
                                             </dl>
+                                            {(data.guardian_signature_data || agreements?.guardian_signature_data) && (
+                                                <div className="mt-3">
+                                                    <p className="m-0 text-xs font-semibold text-[#666]">Guardian Drawn Signature:</p>
+                                                    <div className="mt-1 inline-block rounded-lg border border-black/15 bg-white p-2">
+                                                        <img
+                                                            src={data.guardian_signature_data || agreements?.guardian_signature_data}
+                                                            alt="Guardian digital signature"
+                                                            className="max-h-24 max-w-full object-contain"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </Block>
                                     )}
                                 </>

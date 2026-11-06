@@ -12,6 +12,8 @@ import {
 import { apiFetch } from "../auth";
 import { to12 } from "../components/payUtils";
 import VideoCall from "../components/VideoCall"; // <-- IMPORT NG VIDEO CALL
+import ReceiptModal from "../components/ReceiptModal";
+import TherapistProfileModal from "../components/TherapistProfileModal";
 
 const MESSAGES = {
   Confirmed: "Your appointment is confirmed. We look forward to seeing you.",
@@ -169,6 +171,8 @@ export default function MyAppointments() {
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState("");
   const [detailsId, setDetailsId] = useState(null);
+  const [receiptApt, setReceiptApt] = useState(null);
+  const [viewingProfile, setViewingProfile] = useState(null);
   
   // State para sa Video Call
   const [inCall, setInCall] = useState(false);
@@ -410,16 +414,38 @@ export default function MyAppointments() {
                           className="rounded-2xl border border-[#666]/31 bg-white p-6"
                         >
                           <div className="mb-5 flex flex-col items-center gap-4 text-center md:flex-row md:text-left">
-                            <Photo
-                              src="/img/cartoon-female-psychologist-portrait.png"
-                              className={avatarClass}
-                              fallback={avatarFallback}
-                            />
+                            <button
+                              type="button"
+                              onClick={() => setViewingProfile({
+                                name: apt.doctor,
+                                role: apt.raw?.psychologist_role || "AFFILIATE",
+                              })}
+                              className="bg-transparent border-0 p-0 cursor-pointer transition hover:opacity-85"
+                              title="View psychologist profile"
+                            >
+                              <Photo
+                                src="/img/cartoon-female-psychologist-portrait.png"
+                                className={avatarClass}
+                                fallback={avatarFallback}
+                              />
+                            </button>
                             <div>
                               <h4 className="mb-1 mt-0 font-serif text-[1.1rem] text-[#355f52]">
                                 {apt.service}
                               </h4>
-                              <p className="m-0 text-[0.8rem] text-[#666]">{apt.doctor}</p>
+                              <p className="m-0 text-[0.8rem] text-[#666]">
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingProfile({
+                                    name: apt.doctor,
+                                    role: apt.raw?.psychologist_role || "AFFILIATE",
+                                  })}
+                                  className="bg-transparent border-0 p-0 text-inherit hover:text-[#2a6a53] hover:underline cursor-pointer font-[inherit]"
+                                  title="View psychologist profile"
+                                >
+                                  {apt.doctor}
+                                </button>
+                              </p>
                             </div>
                             <span className="rounded-lg bg-[#9ac5be]/24 px-2.5 py-1 text-[0.7rem] font-bold text-[#345e51] md:ml-auto">
                               {apt.status}
@@ -464,6 +490,13 @@ export default function MyAppointments() {
                               onClick={() => setDetailsId(apt.id)}
                             >
                               View details
+                            </button>
+                            <button
+                              type="button"
+                              className={`${cardLinkClass} text-[#2a6a53]`}
+                              onClick={() => setReceiptApt(apt.raw || apt)}
+                            >
+                              Print receipt
                             </button>
                             <Link to="/contact" className={cardLinkClass}>
                               Message
@@ -591,15 +624,44 @@ export default function MyAppointments() {
                 </div>
               ))}
             </dl>
-            <button
-              type="button"
-              className={`${btnSolid} mt-6 w-full`}
-              onClick={() => setDetailsId(null)}
-            >
-              Close
-            </button>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#2a6a53] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#235845] transition cursor-pointer"
+                onClick={() => {
+                  setReceiptApt(details.raw || details);
+                  setDetailsId(null);
+                }}
+              >
+                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print Receipt
+              </button>
+              <button
+                type="button"
+                className={`${btnGhost} flex-1`}
+                onClick={() => setDetailsId(null)}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {receiptApt && (
+        <ReceiptModal
+          appointment={receiptApt}
+          onClose={() => setReceiptApt(null)}
+        />
+      )}
+
+      {viewingProfile && (
+        <TherapistProfileModal
+          profile={viewingProfile}
+          onClose={() => setViewingProfile(null)}
+        />
       )}
     </div>
   );

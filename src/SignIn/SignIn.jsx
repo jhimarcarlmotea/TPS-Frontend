@@ -284,6 +284,9 @@ export default function SignIn() {
     if (mode === "signup") {
       if (!firstName.trim() || !lastName.trim()) return fail("Please enter your first and last name.");
       if (!email.includes("@")) return fail("Enter a valid email address.");
+      if (phone.trim() && !/^09\d{9}$/.test(phone.trim())) {
+        return fail("Phone number must be 11 digits starting with 09 (e.g. 09123456789).");
+      }
       if (password.length < 8) return fail("Password must be at least 8 characters.");
       if (password !== confirm) return fail("Passwords do not match.");
 
@@ -539,11 +542,13 @@ export default function SignIn() {
                       PHONE (OPTIONAL)
                       <input
                         type="tel"
+                        inputMode="numeric"
+                        maxLength={11}
                         className={inputClass}
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
                         autoComplete="tel"
-                        placeholder="09xx xxx xxxx"
+                        placeholder="09123456789"
                       />
                     </label>
                   )}

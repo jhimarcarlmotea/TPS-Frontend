@@ -29,6 +29,7 @@ import AffiliateSchedule from "./affiliate/affiliateschedule";
 import AffiliatePayment from "./affiliate/affiliatepayment";
 import Profile from "./pages/Profile";
 import HoldExpiryModal from "./BookSession/HoldExpiryModal";
+import AdminMessages from "./admin/adminmessages";
 
 const ClientArea = ({ children }) => (
   <RequireAuth roles={["CLIENT", "ADMIN"]}>{children}</RequireAuth>
@@ -104,6 +105,7 @@ export default function App() {
       <Route path="/admin/services" element={<AdminOnly><AdminServices /></AdminOnly>} />
       <Route path="/admin/client" element={<AdminOnly><AdminClient /></AdminOnly>} />
       <Route path="/admin/home" element={<AdminOnly><AdminHome /></AdminOnly>} />
+      <Route path="/admin/messages" element={<AdminOnly><AdminMessages /></AdminOnly>} />
       {/* AFFILIATE */}
       <Route path="/affiliate" element={<AffiliateOnly><AffiliateDashboard /></AffiliateOnly>} />
       <Route path="/affiliate/appointment" element={<AffiliateOnly><AffiliateAppointment /></AffiliateOnly>} />

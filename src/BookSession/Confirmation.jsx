@@ -14,6 +14,7 @@ import { CLINIC } from "../data/clinic";
 import StepRail from "./StepRail";
 import BookingSummary from "./BookingSummary";
 import { useBooking } from "./bookingContext";
+import ReceiptModal from "../components/ReceiptModal";
 
 const pageShell = "font-sans text-black bg-tf-bg overflow-x-hidden antialiased";
 const mainPad = "py-12 pb-24 max-[720px]:py-7 max-[720px]:pb-16 bg-tf-bg";
@@ -42,6 +43,7 @@ export default function Confirmation() {
   const [appt, setAppt] = useState(null);
   const [loading, setLoading] = useState(!!ref);
   const [error, setError] = useState("");
+  const [showReceipt, setShowReceipt] = useState(false);
 
   useEffect(() => {
     if (!ref) {
@@ -282,6 +284,16 @@ export default function Confirmation() {
                   </p>
 
                   <div className="mt-8 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowReceipt(true)}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#2a6a53] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#235845] transition cursor-pointer"
+                    >
+                      <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      View &amp; Print Receipt
+                    </button>
                     <Link to="/" className={btnGhost}>
                       Back to Home
                     </Link>
@@ -289,6 +301,13 @@ export default function Confirmation() {
                       View My Appointments
                     </Link>
                   </div>
+
+                  {showReceipt && (
+                    <ReceiptModal
+                      appointment={appt}
+                      onClose={() => setShowReceipt(false)}
+                    />
+                  )}
                 </>
               )}
             </Reveal>

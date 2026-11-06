@@ -10,6 +10,7 @@ const inknut = "font-['Inknut_Antiqua',Georgia,serif]";
 const NAV_ITEMS = [
     { label: "Dashboard", to: "/admin" },
     { label: "Appointment", to: "/admin/appointment" },
+    { label: "Messages", to: "/admin/messages" },
     { label: "Schedules", to: "/admin/schedule" },
     { label: "Services", to: "/admin/services" },
     { label: "Payment", to: "/admin/payment" },

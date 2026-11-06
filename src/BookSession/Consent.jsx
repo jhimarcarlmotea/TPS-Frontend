@@ -7,6 +7,7 @@ import { DSM5_OPTIONS, DSM5_QUESTIONS } from "../components/dsm5";
 import StepRail from "./StepRail";
 import BookingSummary from "./BookingSummary";
 import { useBooking } from "./bookingContext";
+import SignaturePad from "../components/SignaturePad";
 
 const pageShell = "font-sans text-black bg-tf-bg overflow-x-hidden antialiased";
 const mainPad = "py-12 pb-24 max-[720px]:py-7 max-[720px]:pb-16 bg-tf-bg";
@@ -195,11 +196,13 @@ function validateDsm(a) {
 function validateSign(s, minor, g) {
   const e = {};
   if (!s.certify) e.certify = "Please certify that the information is true and accurate.";
-  if (s.name.trim().length < 2) e.name = "Type your full name as your signature.";
+  if (s.name.trim().length < 2) e.name = "Type your full name as your printed name.";
   else if (!NAME_RE.test(s.name.trim())) e.name = "Name must not contain numbers.";
+  if (!s.signature) e.signature = "Please draw your signature in the box provided.";
   if (minor) {
     if (!NAME_RE.test(g.name.trim())) e.g_name = "Parent / guardian name is required.";
     if (!NAME_RE.test(g.relation.trim())) e.g_relation = "Relationship to the minor is required.";
+    if (!g.signature) e.g_signature = "Parent / guardian signature is required.";
   }
   return e;
 }
@@ -217,8 +220,8 @@ export default function Consent() {
   const [checks, setChecks] = useState({});
   const [intake, setIntake] = useState(emptyIntake);
   const [dsm, setDsm] = useState(Array(23).fill(null));
-  const [sign, setSign] = useState({ name: "", certify: false });
-  const [guardian, setGuardian] = useState({ name: "", relation: "" });
+  const [sign, setSign] = useState({ name: "", certify: false, signature: "" });
+  const [guardian, setGuardian] = useState({ name: "", relation: "", signature: "" });
 
   const [errs, setErrs] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -431,8 +434,8 @@ export default function Consent() {
           },
           consent: { read: true, confidentiality: true, crisis: true, fees: true, privacy: true },
           dsm5: dsm,
-          sign: { name: sign.name.trim(), certify: true },
-          guardian: minor ? { name: guardian.name.trim(), relation: guardian.relation.trim() } : null,
+          sign: { name: sign.name.trim(), certify: true, signature_data: sign.signature },
+          guardian: minor ? { name: guardian.name.trim(), relation: guardian.relation.trim(), signature_data: guardian.signature } : null,
         }),
       });
       try {
@@ -905,7 +908,7 @@ export default function Consent() {
             {e.certify && <p className="m-0 -mt-2 text-xs text-red-600">{e.certify}</p>}
 
             <div className="grid grid-cols-2 gap-4 max-[560px]:grid-cols-1">
-              <Field label="Client’s printed name (signature)" error={e.name}>
+              <Field label="Client’s printed name" error={e.name}>
                 <input
                   className={`${inputClass} ${e.name ? inputErr : ""}`}
                   value={sign.name}
@@ -921,6 +924,16 @@ export default function Consent() {
                 <input type="date" className={inputClass} value={todayStr()} disabled readOnly />
               </Field>
             </div>
+
+            <SignaturePad
+              label="Client’s Digital Signature"
+              value={sign.signature}
+              onChange={(sig) => {
+                setSign((s) => ({ ...s, signature: sig }));
+                setErrs((x) => ({ ...x, signature: undefined }));
+              }}
+              error={e.signature}
+            />
 
             {minor && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -951,6 +964,17 @@ export default function Consent() {
                       }}
                     />
                   </Field>
+                </div>
+                <div className="mt-4">
+                  <SignaturePad
+                    label="Parent / Guardian Digital Signature"
+                    value={guardian.signature}
+                    onChange={(sig) => {
+                      setGuardian((g) => ({ ...g, signature: sig }));
+                      setErrs((x) => ({ ...x, g_signature: undefined }));
+                    }}
+                    error={e.g_signature}
+                  />
                 </div>
               </div>
             )}

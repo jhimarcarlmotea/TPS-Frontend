@@ -1,38 +1,31 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import AdminNavigation from "./adminnavigation";
 import ProfileMenu from "../components/ProfileMenu";
+import { apiFetch } from "../auth";
 
 const FONT_CSS = `@import url('https://fonts.googleapis.com/css2?family=Inria+Serif:wght@400;700&family=Inter:wght@400;600;700&display=swap');`;
 const inter = "font-['Inter',Helvetica,sans-serif]";
 const serif = "font-['Inria_Serif',Georgia,serif]";
 
-/* ------------------------------------------------------------------ */
-/*  Mock data (palitan ng API call)                                    */
-/* ------------------------------------------------------------------ */
-const SEED = [
-    { id: 1, name: "Juan Delacruz", email: "juan.delacruz@gmail.com", phone: "0917 123 4567", role: "Client", status: "Active", joined: "Oct 02, 2026" },
-    { id: 2, name: "Maria Reyes", email: "maria.reyes@gmail.com", phone: "0918 234 5678", role: "Client", status: "Active", joined: "Sep 21, 2026" },
-    { id: 3, name: "Dr. Ana Santos", email: "ana.santos@threefold.ph", phone: "0919 345 6789", role: "Psychologist", status: "Active", joined: "Jan 11, 2026" },
-    { id: 4, name: "Dr. Paolo Lim", email: "paolo.lim@threefold.ph", phone: "0920 456 7890", role: "Psychologist", status: "Active", joined: "Mar 04, 2026" },
-    { id: 5, name: "Carla Mendoza", email: "carla.m@gmail.com", phone: "0921 567 8901", role: "Affiliate", status: "Pending", joined: "Oct 14, 2026" },
-    { id: 6, name: "Ramon Tan", email: "ramon.tan@yahoo.com", phone: "0922 678 9012", role: "Client", status: "Suspended", joined: "Jun 18, 2026" },
-    { id: 7, name: "Liza Aquino", email: "liza.aquino@gmail.com", phone: "0923 789 0123", role: "Affiliate", status: "Active", joined: "Aug 30, 2026" },
-    { id: 8, name: "Dr. Joy Villanueva", email: "joy.v@threefold.ph", phone: "0924 890 1234", role: "Psychologist", status: "Pending", joined: "Oct 12, 2026" },
-];
-
-const ROLES = ["All", "Client", "Psychologist", "Affiliate"];
+const ROLES = ["All", "Client", "Psychologist", "Affiliate", "Admin"];
 const STATUS_STYLE = {
     Active: "bg-[#d7eee8] text-[#1f6b55]",
     Pending: "bg-[#fdf1bc] text-[#8a6a00]",
     Suspended: "bg-[#fde3df] text-[#b3382a]",
 };
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 8;
 
 /* ------------------------------------------------------------------ */
 /*  Small pieces                                                       */
 /* ------------------------------------------------------------------ */
 const Avatar = ({ name }) => {
-    const initials = name.replace("Dr. ", "").split(" ").map((p) => p[0]).slice(0, 2).join("");
+    const initials = (name || "Account")
+        .replace(/^Dr\.\s*/i, "")
+        .split(" ")
+        .map((p) => p[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase();
     return (
         <span className={`${inter} flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[#4a9b8e30] text-[12px] font-bold text-[#1f6b55]`}>
             {initials}
@@ -41,7 +34,7 @@ const Avatar = ({ name }) => {
 };
 
 const StatusBadge = ({ status }) => (
-    <span className={`${serif} inline-flex h-[20px] items-center rounded-full px-[10px] text-[11px] font-bold ${STATUS_STYLE[status]}`}>
+    <span className={`${serif} inline-flex h-[20px] items-center rounded-full px-[10px] text-[11px] font-bold ${STATUS_STYLE[status] || STATUS_STYLE.Active}`}>
         {status}
     </span>
 );
@@ -53,11 +46,8 @@ const Field = ({ label, children }) => (
     </label>
 );
 
-// 16px sa mobile para hindi mag-auto-zoom ang iOS Safari kapag nag-focus sa input
 const inputCls = `${inter} h-[40px] rounded-[6px] border border-[#c7b6b6] bg-white px-[12px] text-[16px] text-[#202020] outline-none focus:border-[#4a9b8e] focus:ring-2 focus:ring-[#4a9b8e]/25 sm:h-[38px] sm:text-[13px]`;
-
-// Mas malaking tap target sa mobile (32px), original size (24px) sa md pataas
-const actionBtn = `${serif} h-[32px] rounded-[4px] border px-[12px] text-[12px] md:h-[24px] md:px-[10px] md:text-[11px]`;
+const actionBtn = `${serif} h-[32px] rounded-[4px] border px-[12px] text-[12px] md:h-[24px] md:px-[10px] md:text-[11px] cursor-pointer transition`;
 const neutralBtn = `${actionBtn} border-[#c7b6b6] bg-white text-[#202020] hover:bg-[#f2f2f2]`;
 
 const RowActions = ({ a, onApprove, onEdit, onSuspend, onDelete, className = "" }) => (
@@ -85,15 +75,48 @@ const RowActions = ({ a, onApprove, onEdit, onSuspend, onDelete, className = "" 
 const AccountModal = ({ account, onClose, onSave }) => {
     const isEdit = !!account;
     const [form, setForm] = useState(
-        account ? { ...account, password: "" } : { name: "", email: "", phone: "", password: "", role: "Client", status: "Active" }
+        account
+            ? {
+                first_name: account.first_name || account.name?.split(" ")[0] || "",
+                last_name: account.last_name || account.name?.split(" ").slice(1).join(" ") || "",
+                email: account.email || "",
+                phone: account.phone === "—" ? "" : (account.phone || ""),
+                password: "",
+                role: account.raw_role || (account.role?.toUpperCase() === "ADMIN" ? "ADMIN" : account.role?.toUpperCase() === "AFFILIATE" ? "AFFILIATE" : "CLIENT"),
+                status: account.status || "Active",
+            }
+            : { first_name: "", last_name: "", email: "", phone: "", password: "", role: "CLIENT", status: "Active" }
     );
     const [showPw, setShowPw] = useState(false);
-    const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
 
-    const phoneOk = /^(09|\+639)\d{9}$/.test((form.phone || "").replace(/[\s-]/g, ""));
-    // New account: password required. Edit: blank = keep current password.
+    const set = (k) => (e) => {
+        let v = e.target.value;
+        if (k === "phone") {
+            v = v.replace(/\D/g, "").slice(0, 11);
+        }
+        setForm({ ...form, [k]: v });
+    };
+
+    const phoneOk = !form.phone || /^09\d{9}$/.test(form.phone);
     const pwOk = isEdit ? form.password === "" || form.password.length >= 8 : form.password.length >= 8;
-    const valid = form.name.trim() && /\S+@\S+\.\S+/.test(form.email) && phoneOk && pwOk;
+    const valid = form.first_name.trim() && form.last_name.trim() && /\S+@\S+\.\S+/.test(form.email) && phoneOk && pwOk;
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!valid || saving) return;
+        setSaving(true);
+        setError("");
+        try {
+            await onSave(form, account?.id);
+            onClose();
+        } catch (err) {
+            setError(err.message || "Failed to save account.");
+        } finally {
+            setSaving(false);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-[16px]" onClick={onClose}>
@@ -106,16 +129,40 @@ const AccountModal = ({ account, onClose, onSave }) => {
                 <h2 className={`${serif} text-[20px] font-bold text-[#2f4a42]`}>
                     {account ? "Edit account" : "Add account"}
                 </h2>
-                <div className="mt-[20px] flex flex-col gap-[14px]">
-                    <Field label="Full name"><input className={inputCls} value={form.name} onChange={set("name")} /></Field>
-                    <Field label="Email"><input type="email" className={inputCls} value={form.email} onChange={set("email")} /></Field>
-                    <Field label="Phone number">
-                        <input type="tel" placeholder="0917 123 4567" className={inputCls} value={form.phone} onChange={set("phone")} />
+                {error && (
+                    <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                        {error}
+                    </p>
+                )}
+                <form onSubmit={handleSubmit} className="mt-[20px] flex flex-col gap-[14px]">
+                    <div className="grid grid-cols-2 gap-2">
+                        <Field label="First name">
+                            <input className={inputCls} value={form.first_name} onChange={set("first_name")} required />
+                        </Field>
+                        <Field label="Last name">
+                            <input className={inputCls} value={form.last_name} onChange={set("last_name")} required />
+                        </Field>
+                    </div>
+                    <Field label="Email">
+                        <input type="email" className={inputCls} value={form.email} onChange={set("email")} required />
+                    </Field>
+                    <Field label="Phone number (11 digits)">
+                        <input
+                            type="tel"
+                            inputMode="numeric"
+                            maxLength={11}
+                            placeholder="09123456789"
+                            className={inputCls}
+                            value={form.phone}
+                            onChange={set("phone")}
+                        />
                         {form.phone && !phoneOk && (
-                            <span className={`${serif} text-[11px] text-[#b3382a]`}>Use a PH mobile number, e.g. 0917 123 4567.</span>
+                            <span className={`${serif} text-[11px] text-[#b3382a]`}>
+                                Must be 11 digits starting with 09 (e.g. 09123456789).
+                            </span>
                         )}
                     </Field>
-                    <Field label={isEdit ? "New password" : "Password"}>
+                    <Field label={isEdit ? "New password (leave blank to keep current)" : "Password"}>
                         <div className="relative">
                             <input
                                 type={showPw ? "text" : "password"}
@@ -128,107 +175,150 @@ const AccountModal = ({ account, onClose, onSave }) => {
                             <button
                                 type="button"
                                 onClick={() => setShowPw(!showPw)}
-                                className={`${serif} absolute right-[10px] top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#2a8570] underline`}
+                                className={`${serif} absolute right-[10px] top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#2a8570] underline cursor-pointer`}
                             >
                                 {showPw ? "Hide" : "Show"}
                             </button>
                         </div>
-                        {form.password && form.password.length < 8 && (
-                            <span className={`${serif} text-[11px] text-[#b3382a]`}>Password must be at least 8 characters.</span>
-                        )}
                     </Field>
                     <div className="grid grid-cols-1 gap-[14px] sm:grid-cols-2">
                         <Field label="Role">
                             <select className={inputCls} value={form.role} onChange={set("role")}>
-                                {ROLES.slice(1).map((r) => <option key={r}>{r}</option>)}
+                                <option value="CLIENT">Client</option>
+                                <option value="AFFILIATE">Affiliate / Psychologist</option>
+                                <option value="ADMIN">Admin</option>
                             </select>
                         </Field>
                         <Field label="Status">
                             <select className={inputCls} value={form.status} onChange={set("status")}>
-                                {Object.keys(STATUS_STYLE).map((s) => <option key={s}>{s}</option>)}
+                                <option value="Active">Active</option>
+                                <option value="Suspended">Suspended</option>
                             </select>
                         </Field>
                     </div>
-                </div>
-                <div className="mt-[24px] flex justify-end gap-[10px]">
-                    <button onClick={onClose} className={`${serif} h-[38px] rounded-[6px] border border-[#c7b6b6] bg-white px-[16px] text-[13px] text-[#202020] hover:bg-[#f2f2f2] sm:h-[34px]`}>
-                        Cancel
-                    </button>
-                    <button
-                        disabled={!valid}
-                        onClick={() => onSave(form)}
-                        className={`${serif} h-[38px] rounded-[6px] bg-[#11a086] px-[16px] text-[13px] text-white hover:bg-[#0e8c75] disabled:cursor-not-allowed disabled:opacity-50 sm:h-[34px]`}
-                    >
-                        Save changes
-                    </button>
-                </div>
+                    <div className="mt-[24px] flex justify-end gap-[10px]">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className={`${serif} h-[38px] rounded-[6px] border border-[#c7b6b6] bg-white px-[16px] text-[13px] text-[#202020] hover:bg-[#f2f2f2] cursor-pointer sm:h-[34px]`}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={!valid || saving}
+                            className={`${serif} h-[38px] rounded-[6px] bg-[#11a086] px-[16px] text-[13px] text-white hover:bg-[#0e8c75] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer sm:h-[34px]`}
+                        >
+                            {saving ? "Saving…" : "Save changes"}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );
 };
 
 /* ------------------------------------------------------------------ */
-/*  Page                                                               */
+/*  Main Page                                                          */
 /* ------------------------------------------------------------------ */
 export default function AdminAccounts() {
-    const [accounts, setAccounts] = useState(SEED);
+    const [accounts, setAccounts] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [role, setRole] = useState("All");
     const [status, setStatus] = useState("All");
     const [query, setQuery] = useState("");
     const [page, setPage] = useState(1);
-    const [modal, setModal] = useState(null); // null | "new" | account object
+    const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
+    const [modal, setModal] = useState(null);
     const [toast, setToast] = useState("");
-    const [navOpen, setNavOpen] = useState(false); // mobile drawer para sa AdminNavigation
+    const [navOpen, setNavOpen] = useState(false);
 
     const notify = (msg) => {
         setToast(msg);
-        setTimeout(() => setToast(""), 2500);
+        setTimeout(() => setToast(""), 2800);
     };
+
+    const loadAccounts = () => {
+        setLoading(true);
+        const params = new URLSearchParams({
+            role,
+            q: query,
+            page: String(page),
+            per_page: String(PAGE_SIZE),
+        });
+
+        apiFetch(`/admin/accounts?${params.toString()}`)
+            .then((data) => {
+                setAccounts(data.accounts || []);
+                if (data.meta) setMeta(data.meta);
+            })
+            .catch((err) => notify(err.message || "Failed to load accounts."))
+            .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        loadAccounts();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [role, query, page]);
 
     const filtered = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        return accounts.filter(
-            (a) =>
-                (role === "All" || a.role === role) &&
-                (status === "All" || a.status === status) &&
-                (!q || a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q))
-        );
-    }, [accounts, role, status, query]);
+        if (status === "All") return accounts;
+        return accounts.filter((a) => a.status === status);
+    }, [accounts, status]);
 
-    const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-    const current = Math.min(page, pages);
-    const rows = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
-
-    const count = (r) => (r === "All" ? accounts.length : accounts.filter((a) => a.role === r).length);
-
-    const save = (formData) => {
-        // Hindi dapat naka-store ang password sa list; ipadala sa API (hashed sa backend)
-        const { password, ...form } = formData;
-        if (form.id) {
-            setAccounts((p) => p.map((a) => (a.id === form.id ? form : a)));
-            notify("Account updated");
+    const saveAccount = async (formData, id) => {
+        if (id) {
+            await apiFetch(`/admin/accounts/${id}`, {
+                method: "PUT",
+                body: JSON.stringify(formData),
+            });
+            notify("Account updated successfully.");
         } else {
-            setAccounts((p) => [{ ...form, id: Date.now(), joined: "Oct 26, 2026" }, ...p]);
-            notify("Account added");
+            await apiFetch("/admin/accounts", {
+                method: "POST",
+                body: JSON.stringify(formData),
+            });
+            notify("Account created successfully.");
         }
-        setModal(null);
+        loadAccounts();
     };
 
-    const toggleSuspend = (a) => {
+    const toggleSuspend = async (a) => {
         const next = a.status === "Suspended" ? "Active" : "Suspended";
-        setAccounts((p) => p.map((x) => (x.id === a.id ? { ...x, status: next } : x)));
-        notify(next === "Suspended" ? "Account suspended" : "Account reactivated");
+        try {
+            await apiFetch(`/admin/accounts/${a.id}/status`, {
+                method: "POST",
+                body: JSON.stringify({ status: next }),
+            });
+            notify(next === "Suspended" ? "Account suspended." : "Account reactivated.");
+            loadAccounts();
+        } catch (err) {
+            notify(err.message || "Could not update status.");
+        }
     };
 
-    const approve = (a) => {
-        setAccounts((p) => p.map((x) => (x.id === a.id ? { ...x, status: "Active" } : x)));
-        notify("Account approved");
+    const approve = async (a) => {
+        try {
+            await apiFetch(`/admin/accounts/${a.id}/status`, {
+                method: "POST",
+                body: JSON.stringify({ status: "Active" }),
+            });
+            notify("Account approved.");
+            loadAccounts();
+        } catch (err) {
+            notify(err.message || "Could not approve account.");
+        }
     };
 
-    const remove = (a) => {
-        if (!window.confirm(`Delete ${a.name}'s account? This can't be undone.`)) return;
-        setAccounts((p) => p.filter((x) => x.id !== a.id));
-        notify("Account deleted");
+    const remove = async (a) => {
+        if (!window.confirm(`Delete ${a.name}'s account? This action cannot be undone.`)) return;
+        try {
+            await apiFetch(`/admin/accounts/${a.id}`, { method: "DELETE" });
+            notify("Account deleted successfully.");
+            loadAccounts();
+        } catch (err) {
+            notify(err.message || "Could not delete account.");
+        }
     };
 
     const actionProps = { onApprove: approve, onEdit: setModal, onSuspend: toggleSuspend, onDelete: remove };
@@ -237,12 +327,10 @@ export default function AdminAccounts() {
         <div className="flex min-h-screen w-full bg-[#f2f2f2] antialiased">
             <style>{FONT_CSS}</style>
 
-            {/* Sidebar: laging nakikita sa lg pataas */}
             <div className="hidden lg:block">
                 <AdminNavigation />
             </div>
 
-            {/* Sidebar: drawer sa mobile/tablet */}
             {navOpen && (
                 <div className="fixed inset-0 z-50 flex lg:hidden">
                     <div className="h-full overflow-y-auto bg-white">
@@ -257,7 +345,6 @@ export default function AdminAccounts() {
             )}
 
             <main className="min-w-0 flex-1 px-[16px] pb-[48px] pt-[20px] sm:px-[28px] sm:pt-[32px] lg:px-[41px] lg:pb-[60px] lg:pt-[51px]">
-                {/* Header */}
                 <header className="flex items-start justify-between gap-[12px]">
                     <div className="min-w-0">
                         <div className="flex items-center gap-[12px]">
@@ -278,14 +365,14 @@ export default function AdminAccounts() {
                             Manage accounts
                         </h1>
                         <p className={`${serif} mt-[4px] text-[13px] text-[#666] sm:text-[14px]`}>
-                            Add, approve, edit, or suspend clients, psychologists, and affiliates.
+                            Connected live to database. Add, edit, suspend, or delete client, affiliate, and admin accounts.
                         </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-[10px] sm:gap-[17px]">
                         <button
                             onClick={() => setModal("new")}
                             aria-label="Add account"
-                            className={`${inter} flex h-[37px] items-center gap-[8px] rounded-[8px] bg-[#1f4d3f] px-[12px] text-[13px] font-bold text-white hover:bg-[#2f4a42] sm:px-[16px]`}
+                            className={`${inter} flex h-[37px] items-center gap-[8px] rounded-[8px] bg-[#1f4d3f] px-[12px] text-[13px] font-bold text-white hover:bg-[#2f4a42] transition cursor-pointer sm:px-[16px]`}
                         >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
                                 <path d="M12 5v14M5 12h14" />
@@ -296,8 +383,8 @@ export default function AdminAccounts() {
                     </div>
                 </header>
 
-                {/* Role tabs */}
-                <div className="mt-[24px] grid grid-cols-2 gap-[12px] sm:mt-[34px] lg:grid-cols-4 lg:gap-[29px]">
+                {/* Role selection tabs */}
+                <div className="mt-[24px] grid grid-cols-2 gap-[12px] sm:mt-[34px] lg:grid-cols-5 lg:gap-[16px]">
                     {ROLES.map((r) => {
                         const on = role === r;
                         return (
@@ -305,14 +392,15 @@ export default function AdminAccounts() {
                                 key={r}
                                 onClick={() => { setRole(r); setPage(1); }}
                                 aria-pressed={on}
-                                className={`relative h-[88px] overflow-hidden rounded-tl-[18px] rounded-tr-[7px] rounded-br-[18px] rounded-bl-[7px] border px-[16px] text-left transition-colors sm:h-[100px] lg:h-[110px] lg:px-[23px] ${on ? "border-[#c7b6b6] bg-[#1f4d3f]" : "border-[#2020203d] bg-white hover:bg-[#fafafa]"
-                                    }`}
+                                className={`relative h-[88px] overflow-hidden rounded-xl border px-[16px] text-left transition-colors cursor-pointer ${
+                                    on ? "border-[#1f4d3f] bg-[#1f4d3f] text-white" : "border-[#2020203d] bg-white hover:bg-[#fafafa]"
+                                }`}
                             >
                                 <div className={`${inter} text-[10px] font-bold sm:text-[11px] ${on ? "text-[#a8c8b8]" : "text-[#666]"}`}>
-                                    {r === "All" ? "ALL ACCOUNTS" : r.toUpperCase() + "S"}
+                                    {r === "All" ? "ALL ROLES" : r.toUpperCase()}
                                 </div>
-                                <div className={`${inter} mt-[10px] text-[26px] font-bold sm:mt-[14px] sm:text-[32px] ${on ? "text-white" : "text-[#202020]"}`}>
-                                    {count(r)}
+                                <div className={`${inter} mt-[10px] text-[20px] font-bold sm:mt-[14px] sm:text-[24px] ${on ? "text-white" : "text-[#202020]"}`}>
+                                    {r === role ? meta.total : "—"}
                                 </div>
                             </button>
                         );
@@ -323,18 +411,20 @@ export default function AdminAccounts() {
                 <section className="mt-[24px] rounded-[10px] border border-[#c7b6b6] bg-white sm:mt-[32px]">
                     <div className="flex flex-col gap-[12px] px-[16px] py-[16px] sm:px-[24px] sm:py-[20px] md:flex-row md:items-center md:justify-between md:gap-[16px]">
                         <div>
-                            <h2 className={`${serif} text-[16px] text-black`}>
-                                {role === "All" ? "All accounts" : `${role}s`}
+                            <h2 className={`${serif} text-[16px] text-black font-bold`}>
+                                {role === "All" ? "All registered accounts" : `${role} accounts`}
                             </h2>
-                            <p className={`${serif} text-[11px] text-[#666]`}>{filtered.length} found</p>
+                            <p className={`${serif} text-[11px] text-[#666]`}>
+                                {loading ? "Loading…" : `${meta.total || filtered.length} total accounts`}
+                            </p>
                         </div>
                         <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:gap-[12px]">
                             <input
                                 value={query}
                                 onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-                                placeholder="Search name or email"
+                                placeholder="Search name, email, or phone"
                                 aria-label="Search accounts"
-                                className={`${inputCls} w-full sm:flex-1 md:w-[220px] md:flex-none lg:w-[260px]`}
+                                className={`${inputCls} w-full sm:flex-1 md:w-[240px] md:flex-none`}
                             />
                             <select
                                 value={status}
@@ -342,47 +432,19 @@ export default function AdminAccounts() {
                                 aria-label="Filter by status"
                                 className={`${inputCls} w-full sm:w-[150px]`}
                             >
-                                {["All", ...Object.keys(STATUS_STYLE)].map((s) => (
-                                    <option key={s} value={s}>{s === "All" ? "All statuses" : s}</option>
-                                ))}
+                                <option value="All">All statuses</option>
+                                <option value="Active">Active</option>
+                                <option value="Suspended">Suspended</option>
                             </select>
                         </div>
                     </div>
 
-                    {/* Mobile: card list (< md) */}
-                    <ul className="md:hidden">
-                        {rows.map((a) => (
-                            <li key={a.id} className="border-t border-[#e8e8e8] px-[16px] py-[14px]">
-                                <div className="flex items-start gap-[12px]">
-                                    <Avatar name={a.name} />
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-start justify-between gap-[8px]">
-                                            <div className={`${serif} text-[14px] text-black`}>{a.name}</div>
-                                            <StatusBadge status={a.status} />
-                                        </div>
-                                        <div className={`${serif} mt-[2px] break-all text-[12px] text-[#666]`}>{a.email}</div>
-                                        <div className={`${serif} text-[12px] text-[#666]`}>{a.phone}</div>
-                                        <div className={`${serif} mt-[4px] text-[12px] text-[#666]`}>
-                                            {a.role} · Joined {a.joined}
-                                        </div>
-                                    </div>
-                                </div>
-                                <RowActions a={a} {...actionProps} className="mt-[12px]" />
-                            </li>
-                        ))}
-                        {rows.length === 0 && (
-                            <li className={`${serif} border-t border-[#e8e8e8] px-[16px] py-[40px] text-center text-[13px] text-[#666]`}>
-                                No accounts match these filters. Clear the search or pick another role.
-                            </li>
-                        )}
-                    </ul>
-
-                    {/* Tablet/desktop: table (md pataas) */}
-                    <div className="hidden overflow-x-auto md:block">
-                        <table className="w-full border-t border-[#e8e8e8] text-left">
+                    {/* Table View */}
+                    <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-left">
                             <thead>
-                                <tr className={`${inter} text-[11px] font-bold text-[#666]`}>
-                                    <th className="px-[24px] py-[12px] font-bold">Name</th>
+                                <tr className={`${inter} text-[11px] font-bold text-[#666] bg-[#fcfcfc]`}>
+                                    <th className="px-[24px] py-[12px] font-bold">User</th>
                                     <th className="py-[12px] pr-[12px] font-bold">Role</th>
                                     <th className="py-[12px] pr-[12px] font-bold">Status</th>
                                     <th className="hidden py-[12px] pr-[12px] font-bold xl:table-cell">Joined</th>
@@ -390,31 +452,40 @@ export default function AdminAccounts() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {rows.map((a) => (
-                                    <tr key={a.id} className="border-t border-[#e8e8e8] hover:bg-[#fafafa]">
-                                        <td className="px-[24px] py-[12px]">
-                                            <div className="flex items-center gap-[12px]">
-                                                <Avatar name={a.name} />
-                                                <div className="min-w-0">
-                                                    <div className={`${serif} text-[13px] text-black`}>{a.name}</div>
-                                                    <div className={`${serif} break-all text-[11px] text-[#666]`}>{a.email} · {a.phone}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className={`${serif} pr-[12px] text-[13px] text-black`}>{a.role}</td>
-                                        <td className="pr-[12px]"><StatusBadge status={a.status} /></td>
-                                        <td className={`${serif} hidden pr-[12px] text-[13px] text-[#666] xl:table-cell`}>{a.joined}</td>
-                                        <td className="px-[24px]">
-                                            <RowActions a={a} {...actionProps} className="justify-end" />
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={5} className="py-12 text-center text-sm text-[#777]">
+                                            Loading accounts from database…
                                         </td>
                                     </tr>
-                                ))}
-                                {rows.length === 0 && (
+                                ) : filtered.length === 0 ? (
                                     <tr>
                                         <td colSpan={5} className={`${serif} px-[24px] py-[48px] text-center text-[13px] text-[#666]`}>
-                                            No accounts match these filters. Clear the search or pick another role.
+                                            No accounts found.
                                         </td>
                                     </tr>
+                                ) : (
+                                    filtered.map((a) => (
+                                        <tr key={a.id} className="border-t border-[#e8e8e8] hover:bg-[#fafafa]">
+                                            <td className="px-[24px] py-[12px]">
+                                                <div className="flex items-center gap-[12px]">
+                                                    <Avatar name={a.name} />
+                                                    <div className="min-w-0">
+                                                        <div className={`${serif} text-[13px] font-semibold text-black`}>{a.name}</div>
+                                                        <div className={`${serif} break-all text-[11px] text-[#666]`}>
+                                                            {a.email} {a.phone !== "—" && `· ${a.phone}`}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className={`${serif} pr-[12px] text-[13px] text-black font-medium`}>{a.role}</td>
+                                            <td className="pr-[12px]"><StatusBadge status={a.status} /></td>
+                                            <td className={`${serif} hidden pr-[12px] text-[13px] text-[#666] xl:table-cell`}>{a.joined}</td>
+                                            <td className="px-[24px]">
+                                                <RowActions a={a} {...actionProps} className="justify-end" />
+                                            </td>
+                                        </tr>
+                                    ))
                                 )}
                             </tbody>
                         </table>
@@ -423,20 +494,20 @@ export default function AdminAccounts() {
                     {/* Pagination */}
                     <div className="flex items-center justify-between gap-[12px] border-t border-[#e8e8e8] px-[16px] py-[14px] sm:px-[24px]">
                         <span className={`${serif} text-[11px] text-[#666]`}>
-                            Page {current} of {pages}
+                            Page {meta.current_page || page} of {meta.last_page || 1}
                         </span>
                         <div className="flex gap-[6px]">
                             <button
-                                disabled={current === 1}
-                                onClick={() => setPage(current - 1)}
-                                className={`${serif} h-[32px] rounded-[4px] border border-[#c7b6b6] bg-white px-[14px] text-[12px] disabled:opacity-40 sm:h-[24px] sm:px-[12px] sm:text-[11px]`}
+                                disabled={page <= 1}
+                                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                className={`${serif} h-[32px] rounded-[4px] border border-[#c7b6b6] bg-white px-[14px] text-[12px] disabled:opacity-40 cursor-pointer sm:h-[24px] sm:px-[12px] sm:text-[11px]`}
                             >
                                 Previous
                             </button>
                             <button
-                                disabled={current === pages}
-                                onClick={() => setPage(current + 1)}
-                                className={`${serif} h-[32px] rounded-[4px] border border-[#c7b6b6] bg-white px-[14px] text-[12px] disabled:opacity-40 sm:h-[24px] sm:px-[12px] sm:text-[11px]`}
+                                disabled={page >= (meta.last_page || 1)}
+                                onClick={() => setPage((p) => p + 1)}
+                                className={`${serif} h-[32px] rounded-[4px] border border-[#c7b6b6] bg-white px-[14px] text-[12px] disabled:opacity-40 cursor-pointer sm:h-[24px] sm:px-[12px] sm:text-[11px]`}
                             >
                                 Next
                             </button>
@@ -449,12 +520,12 @@ export default function AdminAccounts() {
                 <AccountModal
                     account={modal === "new" ? null : modal}
                     onClose={() => setModal(null)}
-                    onSave={save}
+                    onSave={saveAccount}
                 />
             )}
 
             {toast && (
-                <div role="status" className={`${inter} fixed bottom-[16px] left-[16px] right-[16px] z-[70] rounded-[8px] bg-[#2f4a42] px-[18px] py-[10px] text-center text-[13px] text-white sm:bottom-[28px] sm:left-auto sm:right-[28px] sm:text-left`}>
+                <div role="status" className={`${inter} fixed bottom-[16px] left-[16px] right-[16px] z-[70] rounded-[8px] bg-[#2f4a42] px-[18px] py-[10px] text-center text-[13px] text-white shadow-lg sm:bottom-[28px] sm:left-auto sm:right-[28px] sm:text-left`}>
                     {toast}
                 </div>
             )}

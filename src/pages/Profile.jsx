@@ -152,6 +152,9 @@ export default function Profile() {
     if (!form.first_name.trim() || !form.last_name.trim()) {
       return setMsg({ type: "err", text: "Please enter your first and last name." });
     }
+    if (form.phone.trim() && !/^09\d{9}$/.test(form.phone.trim())) {
+      return setMsg({ type: "err", text: "Phone number must be 11 digits starting with 09 (e.g. 09123456789)." });
+    }
     setSaving(true);
     try {
       const body = {
@@ -502,11 +505,13 @@ export default function Profile() {
             PHONE
             <input
               type="tel"
+              inputMode="numeric"
+              maxLength={11}
               className={inputClass}
               value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "").slice(0, 11) })}
               autoComplete="tel"
-              placeholder="09xx xxx xxxx"
+              placeholder="09123456789"
             />
           </label>
 

@@ -363,7 +363,6 @@ function MethodCard({ m, onChange, onDelete }) {
                     {[
                         ["name", "Name"],
                         ["account_name", "Account name"],
-                        ["account_number", "Account / mobile number"],
                         ["bank", "Bank (optional)"],
                     ].map(([key, label]) => (
                         <label key={key} className={`${serif} text-[11px] text-[#666]`}>
@@ -375,6 +374,21 @@ function MethodCard({ m, onChange, onDelete }) {
                             />
                         </label>
                     ))}
+                    {/* Account / mobile number — digits only, max 11 */}
+                    <label className={`${serif} text-[11px] text-[#666]`}>
+                        Account / mobile number
+                        <input
+                            type="tel"
+                            inputMode="numeric"
+                            maxLength={11}
+                            value={form.account_number}
+                            onChange={(e) =>
+                                setForm({ ...form, account_number: e.target.value.replace(/\D/g, "").slice(0, 11) })
+                            }
+                            placeholder="09XXXXXXXXX"
+                            className={fieldCls}
+                        />
+                    </label>
 
                     <div className="flex items-center gap-[12px]">
                         {(qr || (m.qr_url && !removeQr)) && (
