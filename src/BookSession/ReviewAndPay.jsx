@@ -63,7 +63,11 @@ export default function ReviewAndPay() {
   useEffect(() => {
     if (!serviceId) return;
     let alive = true;
-    apiFetch(`/booking/payment-options?${new URLSearchParams({ service: serviceId })}`)
+    const q = new URLSearchParams({ service: serviceId });
+    if (serviceId === "assessment" && booking.assessmentTypeId) {
+      q.set("assessment_type_id", booking.assessmentTypeId);
+    }
+    apiFetch(`/booking/payment-options?${q}`)
       .then((d) => {
         if (!alive) return;
         setOptions(d);
@@ -245,6 +249,7 @@ export default function ReviewAndPay() {
                   editTo="/book"
                   rows={[
                     { label: "Service", value: service?.name || "—" },
+                    ...(serviceId === "assessment" && booking.assessmentType?.name ? [{ label: "Assessment Type", value: booking.assessmentType.name }] : []),
                     { label: "Psychologist", value: psychName },
                   ]}
                 />

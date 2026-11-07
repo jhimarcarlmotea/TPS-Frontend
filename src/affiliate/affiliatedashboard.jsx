@@ -158,7 +158,7 @@ const Header = ({ onMenu, user, attention }) => {
                 </div>
                 <h1 className={`${serif} mt-[8px] text-[26px] font-bold leading-[1.15] sm:text-[34px] lg:text-[40px]`}>
                     <span className="text-[#2f4a42]">{greet}, </span>
-                    <span className="text-[#4a9b8e]">{user?.last_name ? `Dr. ${user.last_name}` : "Doc"}</span>
+                    <span className="text-[#4a9b8e]">{[user?.first_name, user?.last_name].filter(Boolean).join(" ") || "there"}</span>
                 </h1>
                 <DateChip className="mt-[12px] inline-flex sm:hidden" />
             </div>

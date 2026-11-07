@@ -9,7 +9,7 @@ import {
   btnSolid,
   btnGhost,
 } from "../components/Layout";
-import { apiFetch } from "../auth";
+import { apiFetch, getUser } from "../auth";
 import { to12 } from "../components/payUtils";
 import VideoCall from "../components/VideoCall"; // <-- IMPORT NG VIDEO CALL
 import ReceiptModal from "../components/ReceiptModal";
@@ -163,6 +163,7 @@ function EmptyState({ tab }) {
 
 export default function MyAppointments() {
   const navigate = useNavigate();
+  const firstName = getUser()?.first_name?.trim() || "Client";
   const [tab, setTab] = useState("upcoming");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -263,7 +264,7 @@ export default function MyAppointments() {
                   MY APPOINTMENTS
                 </p>
                 <h1 className="my-2 font-serif text-[2.5rem] text-[#111]">
-                  Hi, <em className="italic text-tf-teal">Client.</em>
+                  Hi, <em className="italic text-tf-teal">{firstName}.</em>
                 </h1>
                 <p className="m-0 text-base text-[#666]">
                   Track upcoming, completed, and cancelled sessions.

@@ -6,6 +6,8 @@ const STORAGE_KEY = "tf_booking";
 const defaultBooking = {
   serviceId: null,
   psychologistId: null,
+  assessmentTypeId: null,   // only used when serviceId === "assessment"
+  assessmentType: null,     // { id, name, price, duration_minutes, hours }
   bookingMode: "psychologist-first", // or "schedule-first"
   date: null, // { year, month, day }
   time: null,
@@ -34,7 +36,13 @@ function load() {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultBooking;
-    return { ...defaultBooking, ...JSON.parse(raw), client: { ...defaultBooking.client, ...JSON.parse(raw).client }, payment: { ...defaultBooking.payment, ...JSON.parse(raw).payment } };
+    const parsed = JSON.parse(raw);
+    return {
+      ...defaultBooking,
+      ...parsed,
+      client: { ...defaultBooking.client, ...parsed.client },
+      payment: { ...defaultBooking.payment, ...parsed.payment },
+    };
   } catch {
     return defaultBooking;
   }
@@ -85,11 +93,21 @@ export function BookingProvider({ children }) {
     });
   }, [booking.date]);
 
-  const fee = service?.fee ?? CLINIC.sessionFee;
+  // If assessment type has its own price, use it; otherwise fall back to service fee
+  const fee = useMemo(() => {
+    if (booking.serviceId === "assessment" && booking.assessmentType?.price > 0) {
+      return booking.assessmentType.price;
+    }
+    return service?.fee ?? CLINIC.sessionFee;
+  }, [booking.serviceId, booking.assessmentType, service]);
+
   const feeLabel = `₱${fee.toLocaleString()}`;
 
   const summaryRows = [
     { label: "SERVICE", value: service?.name || "To be set" },
+    ...(booking.serviceId === "assessment"
+      ? [{ label: "TYPE", value: booking.assessmentType?.name || "To be set" }]
+      : []),
     {
       label: "PSYCHOLOGIST",
       value:

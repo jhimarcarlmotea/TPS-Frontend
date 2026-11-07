@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import AdminNavigation from "./affiliatenav";
+import ProfileMenu from "../components/ProfileMenu";
 
 const FONT_CSS = `@import url('https://fonts.googleapis.com/css2?family=Inknut+Antiqua:wght@400;600;700&family=Inria+Serif:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Inter:wght@400;500;600;700&display=swap');`;
 
@@ -303,6 +304,7 @@ export default function AffiliateSchedule() {
                 </svg>
                 <span className="absolute right-[10px] top-[8px] h-[7px] w-[7px] rounded-full bg-[#e07b6a]" />
               </button>
+              <ProfileMenu size={37} />
             </div>
           </header>
 

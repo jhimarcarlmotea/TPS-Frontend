@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Navbar, Footer, Reveal, Photo, container, btnSolid } from "../components/Layout";
+import { apiFetch, API_URL } from "../auth";
+import { peso } from "../components/payUtils";
 
 /* Where "Book now" goes. */
 const BOOK_TO = "/book";
@@ -145,17 +148,23 @@ function AssessmentArt({ className }) {
   );
 }
 
-/* ---------- Content (edit here, not in the markup) ----------
-   Each service has its own original illustration (see the *Art components above). */
-const SERVICES = [
+/* Illustration per service id. New ids fall back to the assessment art. */
+const ART = {
+  psychotherapy: PsychotherapyArt,
+  aba: AbaArt,
+  assessment: AssessmentArt,
+};
+
+/* ---------- Content ----------
+   The live content comes from the API (edited in Admin > Services, prices set in
+   Admin > Payment methods). DEFAULTS below is only a fallback if the API can't be reached. */
+const DEFAULTS = [
   {
     id: "psychotherapy",
     name: "Psychotherapy / Counseling",
     title: "Psychotherapy / Counseling",
     hours: 1,
-    label: "1 · HOUR SESSION",
     meta: "Online or in-person",
-    Art: PsychotherapyArt,
     text: "Individual talk therapy designed to build self-awareness, explore complex emotions, and develop healthy, lasting ways of coping with daily life.",
     goodFor: ["Anxiety", "Low mood", "Stress & burnout", "Relationships", "Grief"],
     steps: [
@@ -169,9 +178,7 @@ const SERVICES = [
     name: "ABA Therapy",
     title: "ABA Therapy",
     hours: 2,
-    label: "2 · HOUR SESSION",
     meta: "Intensive · For children · Parents involved",
-    Art: AbaArt,
     text: "Structured, play-based sessions using Applied Behavior Analysis. We focus on building skills step by step with positive reinforcement in a warm, encouraging space.",
     goodFor: ["Autism", "Developmental delays", "Communication", "Social skills", "Daily routines"],
     steps: [
@@ -185,9 +192,7 @@ const SERVICES = [
     name: "Assessment & Consultation",
     title: "Assessment & Consultation",
     hours: 1,
-    label: "1 · HOUR SESSION",
     meta: "Comprehensive review · Adults & children",
-    Art: AssessmentArt,
     text: "A thorough review and structured interview that gives you a clear picture of what's going on, along with recommendations tailored to you or your child.",
     goodFor: ["Not sure where to start", "Seeking clarity", "Learning concerns", "Behavior concerns", "Next-step guidance"],
     steps: [
@@ -197,6 +202,33 @@ const SERVICES = [
     ],
   },
 ];
+
+/* Makes sure every service has what the markup needs, whatever the API sends. */
+function normalize(s) {
+  const hours = Number(s.hours) || 1;
+  return {
+    ...s,
+    hours,
+    title: s.title || s.name,
+    meta: s.meta || "",
+    text: s.text || "",
+    goodFor: Array.isArray(s.goodFor) ? s.goodFor : [],
+    steps: Array.isArray(s.steps) ? s.steps : [],
+    assessment_types: Array.isArray(s.assessment_types) ? s.assessment_types : [],
+    label: `${hours} · HOUR SESSION`,
+    price: Number(s.price) || 0,
+    imageUrl: s.image_url || "",
+    downpayment_percent: Number(s.downpayment_percent) || 0,
+    full_only: !!s.full_only,
+    Art: ART[s.id] || AssessmentArt,
+  };
+}
+
+/* Downpayment in pesos, or 0 when the service is full-payment only. */
+function downpaymentOf(s) {
+  if (!s.price || s.full_only || !(s.downpayment_percent > 0) || s.downpayment_percent >= 100) return 0;
+  return Math.round(s.price * s.downpayment_percent) / 100;
+}
 
 /* ---------- Small pieces ---------- */
 const Arrow = ({ dir = "right" }) => (
@@ -230,10 +262,95 @@ const LeafBullet = () => (
 );
 
 /* Wrapper for the illustration */
-function Blob({ Art }) {
+function ServiceArtwork({ Art, src, name }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  return src && !imageFailed
+    ? <img src={src} alt={`${name} service`} className="h-full w-full object-contain" onError={() => setImageFailed(true)} />
+    : <Art className="h-full w-full object-contain" />;
+}
+
+
+/* Image frame: hugis-dahon na litrato, pareho ang itsura kahit anong i-upload ni admin */
+function Blob({ Art, imageUrl, name }) {
+  const [failedSrc, setFailedSrc] = useState("");
+
+  let src = imageUrl;
+  if (src) {
+    try {
+      src = new URL(src, API_URL).toString();
+    } catch {
+      // Keep externally supplied absolute URLs if URL parsing fails.
+    }
+  }
+  const showPhoto = src && failedSrc !== src;
+
+  /* Walang uploaded na image (o hindi ma-load): ang built-in na illustration */
+  if (!showPhoto) {
+    return (
+      <div className="relative mx-auto flex aspect-[500/440] w-full max-w-[520px] items-center justify-center p-[6%]">
+        <Art className="h-full w-full object-contain" />
+      </div>
+    );
+  }
+
+  const leaf = "rounded-[140px_28px_140px_28px]";
+
   return (
-    <div className="w-full max-w-[520px] mx-auto">
-      <Art className="w-full h-auto" />
+    <div className="mx-auto w-full max-w-[520px] px-5 pb-6 pt-5">
+      <div className="group relative">
+        {/* tuldok-tuldok na palamuti */}
+        <svg
+          viewBox="0 0 72 72"
+          className="pointer-events-none absolute -right-5 -top-5 h-[72px] w-[72px]"
+          aria-hidden="true"
+        >
+          {[0, 1, 2, 3].flatMap((r) =>
+            [0, 1, 2, 3].map((c) => (
+              <circle key={`${r}${c}`} cx={9 + c * 18} cy={9 + r * 18} r="2.4" fill="#10a28c" opacity="0.55" />
+            ))
+          )}
+        </svg>
+
+        {/* outline na sumusunod sa hugis ng litrato */}
+        <div
+          className={`pointer-events-none absolute inset-0 translate-x-4 translate-y-4 border-2 border-[#10a28c]/60 ${leaf}`}
+          aria-hidden="true"
+        />
+
+        {/* litrato */}
+        <figure
+          className={`relative m-0 aspect-[5/4] overflow-hidden bg-[#e8f1ee] shadow-[0_26px_50px_-26px_rgba(32,62,67,0.65)] ${leaf}`}
+        >
+          <img
+            src={src}
+            alt={`${name} service`}
+            loading="lazy"
+            className="h-full w-full object-cover object-center transition-transform duration-700 ease-tf group-hover:scale-[1.04]"
+            onError={() => setFailedSrc(src)}
+          />
+          <div className={`pointer-events-none absolute inset-0 ring-1 ring-inset ring-black/10 ${leaf}`} aria-hidden="true" />
+        </figure>
+
+        {/* sprout badge */}
+        <span
+          className="absolute -bottom-5 -left-3 grid h-[64px] w-[64px] place-items-center rounded-full bg-white text-[#10a28c] shadow-[0_12px_28px_-10px_rgba(32,62,67,0.55)] ring-4 ring-[#a9cbbd]"
+          aria-hidden="true"
+        >
+          <svg
+            width="34"
+            height="34"
+            viewBox="0 0 64 64"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M32 56V30" />
+            <path d="M32 34c0-10-7-16-18-16 0 10 7 16 18 16zM32 28c0-9 6-14 16-14 0 9-6 14-16 14z" />
+          </svg>
+        </span>
+      </div>
     </div>
   );
 }
@@ -274,7 +391,7 @@ function Vine({ side }) {
   );
 }
 
-function Glance() {
+function Glance({ services }) {
   return (
     <aside
       className="bg-[#fafafa] border border-black/15 rounded-[19px] pt-6 px-[26px] pb-2 max-[560px]:px-[18px]"
@@ -287,7 +404,7 @@ function Glance() {
         Tap a service to see what&apos;s included before you book.
       </p>
       <ul className="m-0 mt-3.5 p-0 list-none">
-        {SERVICES.map((s) => (
+        {services.map((s) => (
           <li key={s.id} className="border-t border-tf-line first:border-t-0">
             <a
               href={`#${s.id}`}
@@ -299,8 +416,11 @@ function Glance() {
                   See what&apos;s included &amp; how it works
                 </small>
               </span>
-              <span className="font-serif text-sm text-tf-teal whitespace-nowrap">
+              <span className="text-right font-serif text-sm text-tf-teal whitespace-nowrap">
                 {s.hours} hr
+                {s.price > 0 && (
+                  <small className="block text-[11px] text-black/55">{peso(s.price)}</small>
+                )}
               </span>
               <span className="grid place-items-center w-6 h-6 rounded-full bg-[#c9e0d5] text-tf-ink transition-[background,color] duration-250 group-hover:bg-tf-teal group-hover:text-white max-[560px]:hidden">
                 <Arrow />
@@ -314,7 +434,8 @@ function Glance() {
 }
 
 function Service({ s, index }) {
-  const reversed = index % 2 === 1; // ABA: illustration left, text right
+  const reversed = index % 2 === 1; // illustration left, text right
+  const down = downpaymentOf(s);
 
   return (
     <Reveal className="relative">
@@ -342,7 +463,7 @@ function Service({ s, index }) {
             </span>
             <p className="m-0 grid gap-[3px] font-serif">
               <span className="text-[11px] tracking-[0.08em] text-[#10a28c]">{s.label}</span>
-              <small className="text-[11px] text-[#777]">{s.meta}</small>
+              {s.meta && <small className="text-[11px] text-[#777]">{s.meta}</small>}
             </p>
           </div>
 
@@ -357,36 +478,90 @@ function Service({ s, index }) {
             {s.text}
           </p>
 
-          <h3 className="m-0 mt-6 mb-2.5 font-serif font-normal text-[11px] tracking-[0.14em] uppercase text-[#777]">
-            Good for
-          </h3>
-          <ul className="flex flex-wrap gap-2 m-0 p-0 list-none">
-            {s.goodFor.map((t) => (
-              <li
-                key={t}
-                className="font-serif text-[11px] text-[#2c4a4f]/80 bg-[#a9cbbd] py-1 px-3.5 rounded-full"
-              >
-                {t}
-              </li>
-            ))}
-          </ul>
+          {s.goodFor.length > 0 && (
+            <>
+              <h3 className="m-0 mt-6 mb-2.5 font-serif font-normal text-[11px] tracking-[0.14em] uppercase text-[#777]">
+                Good for
+              </h3>
+              <ul className="flex flex-wrap gap-2 m-0 p-0 list-none">
+                {s.goodFor.map((t) => (
+                  <li
+                    key={t}
+                    className="font-serif text-[11px] text-[#2c4a4f]/80 bg-[#a9cbbd] py-1 px-3.5 rounded-full"
+                  >
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
-          <h3 className="m-0 mt-6 mb-3 font-serif font-normal text-[11px] tracking-[0.14em] uppercase text-[#777]">
-            What happens
-          </h3>
-          <ol className="m-0 p-0 list-none grid gap-3.5 max-w-[44ch]">
-            {s.steps.map((t) => (
-              <li
-                key={t}
-                className="relative pl-[20px] font-serif text-[14px] leading-normal text-[#777]"
-              >
-                <LeafBullet />
-                {t}
-              </li>
-            ))}
-          </ol>
+          {s.steps.length > 0 && (
+            <>
+              <h3 className="m-0 mt-6 mb-3 font-serif font-normal text-[11px] tracking-[0.14em] uppercase text-[#777]">
+                What happens
+              </h3>
+              <ol className="m-0 p-0 list-none grid gap-3.5 max-w-[44ch]">
+                {s.steps.map((t) => (
+                  <li
+                    key={t}
+                    className="relative pl-[20px] font-serif text-[14px] leading-normal text-[#777]"
+                  >
+                    <LeafBullet />
+                    {t}
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
 
-          <div className="flex items-center flex-wrap gap-[22px] mt-7">
+          {s.assessment_types && s.assessment_types.length > 0 && (
+            <div className="mt-6">
+              <h3 className="m-0 mb-3 font-serif font-normal text-[11px] tracking-[0.14em] uppercase text-[#777]">
+                Available assessment types
+              </h3>
+              <div className="grid gap-2.5 max-w-[48ch]">
+                {s.assessment_types.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-black/10 bg-white/70 px-4 py-3"
+                  >
+                    <div>
+                      <b className="font-serif text-[14px] font-bold text-[#2c4a4f]">{t.name}</b>
+                      {t.description && (
+                        <p className="m-0 mt-0.5 font-serif text-[12px] text-[#777] leading-relaxed">
+                          {t.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {t.price > 0 && (
+                        <span className="block font-serif text-[14px] font-bold text-[#10a28c]">
+                          {peso(t.price)}
+                        </span>
+                      )}
+                      <span className="block text-[11px] text-[#888]">
+                        {t.duration_minutes >= 60 ? `${Math.round((t.duration_minutes / 60) * 10) / 10} hr` : `${t.duration_minutes} min`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Price comes from Admin > Payment methods */}
+          {s.price > 0 && (
+            <p className="m-0 mt-7 font-serif text-[#2c4a4f]">
+              <span className="text-[24px] font-bold">{peso(s.price)}</span>{" "}
+              <span className="text-[13px] text-[#777]">
+                per session
+                {down > 0 && ` · ${peso(down)} downpayment to hold your slot`}
+              </span>
+            </p>
+          )}
+
+          <div className={`flex items-center flex-wrap gap-[22px] ${s.price > 0 ? "mt-4" : "mt-7"}`}>
             <Link
               to={BOOK_TO}
               className={`${btnSolid} no-underline max-[560px]:flex-1 max-[560px]:min-w-[140px]`}
@@ -404,7 +579,7 @@ function Service({ s, index }) {
 
         {/* Illustration */}
         <div className={reversed ? "min-[901px]:order-1" : ""}>
-          <Blob Art={s.Art} />
+          <Blob Art={s.Art} imageUrl={s.imageUrl} name={s.name} />
         </div>
       </section>
     </Reveal>
@@ -413,6 +588,32 @@ function Service({ s, index }) {
 
 /* ---------- Page ---------- */
 export default function Services() {
+  const [services, setServices] = useState(null); // null = loading
+
+  useEffect(() => {
+    let off = false;
+    apiFetch("/services")
+      .then((d) => {
+        if (off) return;
+        const list = (d.services || []).filter((s) => s.enabled !== false).map(normalize);
+        setServices(list);
+      })
+      .catch(() => {
+        // API unreachable: show the built-in copy (no prices) rather than a blank page
+        if (!off) setServices(DEFAULTS.map(normalize));
+      });
+    return () => {
+      off = true;
+    };
+  }, []);
+
+  // After the content loads, jump to the section if the URL has a #hash (e.g. /services#aba)
+  useEffect(() => {
+    if (services && window.location.hash) {
+      document.getElementById(window.location.hash.slice(1))?.scrollIntoView();
+    }
+  }, [services]);
+
   return (
     <div className="font-sans text-black bg-tf-bg overflow-x-hidden antialiased">
       <Navbar />
@@ -431,26 +632,35 @@ export default function Services() {
                 Care that fits <em className="not-italic text-tf-teal">what you need.</em>
               </h1>
               <p className="m-0 text-base leading-relaxed text-black/70 max-w-[440px]">
-                Three clear ways we can support you. Every session is private, paced by you, and led by a qualified specialist.
+                Clear ways we can support you. Every session is private, paced by you, and led by a qualified specialist.
               </p>
-              <a
-                href="#psychotherapy"
-                className="inline-flex items-center gap-3 mt-7 text-xs text-black/70 no-underline group"
-              >
-                <span className="grid place-items-center w-[30px] h-[30px] rounded-full border border-black/25 transition-[background,border-color] duration-250 group-hover:bg-white group-hover:border-tf-teal">
-                  <Arrow dir="down" />
-                </span>
-                Scroll to explore each service
-              </a>
+              {services && services.length > 0 && (
+                <a
+                  href={`#${services[0].id}`}
+                  className="inline-flex items-center gap-3 mt-7 text-xs text-black/70 no-underline group"
+                >
+                  <span className="grid place-items-center w-[30px] h-[30px] rounded-full border border-black/25 transition-[background,border-color] duration-250 group-hover:bg-white group-hover:border-tf-teal">
+                    <Arrow dir="down" />
+                  </span>
+                  Scroll to explore each service
+                </a>
+              )}
             </div>
-            <Glance />
+            {services && services.length > 0 && <Glance services={services} />}
           </div>
         </header>
 
         <div className={`${container} pb-[clamp(40px,6vw,80px)]`}>
-          {SERVICES.map((s, i) => (
-            <Service key={s.id} s={s} index={i} />
-          ))}
+          {services === null && (
+            <p className="py-16 text-center font-serif text-[15px] text-[#777]">Loading services…</p>
+          )}
+          {services && services.length === 0 && (
+            <p className="py-16 text-center font-serif text-[15px] text-[#777]">
+              No services are available right now. Please check back soon.
+            </p>
+          )}
+          {services &&
+            services.map((s, i) => <Service key={s.id} s={s} index={i} />)}
         </div>
       </main>
       <Footer />

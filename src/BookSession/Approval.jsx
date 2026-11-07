@@ -29,8 +29,8 @@ const STAGES = [
   },
   {
     id: "psychologist_pending",
-    title: "Psychologist approval",
-    detail: "After payment is verified, your psychologist confirms the appointment.",
+    title: "Appointment approval",
+    detail: "After payment is verified, our team confirms the appointment.",
   },
   {
     id: "approved",
@@ -119,6 +119,7 @@ export default function Approval() {
       ? pay.psychologist || "—"
       : "Assigned by the clinic"
     : "—";
+  const isPsychotherapy = pay?.service_id === "psychotherapy";
 
   const summaryRows = [
     { label: "SERVICE", value: pay?.service_name || "—" },
@@ -135,7 +136,7 @@ export default function Approval() {
   ];
 
   const rejectedByPayment = pay?.rejected_by === "payment";
-  const needsConsent = !pay || pay.service_id === "psychotherapy";
+  const needsConsent = !pay || ["psychotherapy", "aba"].includes(pay.service_id);
 
   // Payment na-reject: hindi pwedeng mag-continue, "Back to payment" lang
   const paymentRejected = status === "rejected" && rejectedByPayment;
@@ -202,7 +203,7 @@ export default function Approval() {
                     Appointment status
                   </h2>
                   <p className="m-0 text-sm text-[#666]">
-                    Psychologist approval follows payment verification. This page updates automatically.
+                    Appointment approval follows payment verification. This page updates automatically.
                   </p>
                 </div>
                 <StatusBadge status={status} />
@@ -259,7 +260,9 @@ export default function Approval() {
                   <strong>{rejectedByPayment ? "Payment not verified." : "Appointment not approved."}</strong>{" "}
                   {rejectedByPayment
                     ? "We could not verify your payment."
-                    : "Your psychologist could not accept this request."}
+                    : isPsychotherapy
+                      ? "Your psychologist could not accept this request."
+                      : "The clinic could not accept this request."}
                   {pay?.reason && <> Reason: {pay.reason}</>}{" "}
                   {rejectedByPayment ? "Please go back to payment and submit it again." : "Please contact the clinic or book again."}
                 </div>
@@ -273,7 +276,7 @@ export default function Approval() {
                     <dd className="m-0 font-medium">{pay?.service_name || "—"}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-[#666]">Psychologist</dt>
+                    <dt className="text-[#666]">{isPsychotherapy ? "Psychologist" : "Provider"}</dt>
                     <dd className="m-0 font-medium">{psychText}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
@@ -293,11 +296,17 @@ export default function Approval() {
                   </div>
                 </dl>
                 <p className="m-0 mt-4 text-sm text-tf-body">
-                  {status === "payment_pending" && "Next: wait for payment verification, then psychologist review."}
-                  {status === "psychologist_pending" && "Payment verified. Waiting for psychologist confirmation."}
+                  {status === "payment_pending" &&
+                    (isPsychotherapy
+                      ? "Next: wait for payment verification, then psychologist review."
+                      : "Next: wait for payment verification, then clinic review.")}
+                  {status === "psychologist_pending" &&
+                    (isPsychotherapy
+                      ? "Payment verified. Waiting for psychologist confirmation."
+                      : "Payment verified. Waiting for clinic confirmation.")}
                   {status === "approved" &&
                     (needsConsent
-                      ? "Next step: complete the consent and intake forms before your session."
+                      ? "Next step: complete the consent form before your session."
                       : "Your appointment is confirmed. You may continue.")}
                   {status === "rejected" &&
                     (rejectedByPayment

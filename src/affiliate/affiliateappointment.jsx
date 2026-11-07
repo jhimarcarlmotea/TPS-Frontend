@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AffiliateNavigation from "./affiliatenav";
 import ConsentViewer from "../components/ConsentViewer";
+import ProfileMenu from "../components/ProfileMenu";
 import { apiFetch } from "../auth";
 import { peso, to12 } from "../components/payUtils";
 
@@ -22,9 +23,9 @@ const STATUS = {
     verify: { chip: "Verify payment", cls: "bg-[#fdf1bc] text-[#7a5d00]", steps: ["warn", "todo", "todo"] },
     pending: { chip: "Pending approval", cls: "bg-[#fde3d6] text-[#a4492a]", steps: ["done", "current", "todo"] },
     approved: { chip: "Approved", cls: "bg-[#a9d0c8] text-[#1f4d3f]", steps: ["done", "done", "current"] },
-    completed: { chip: "Completed", cls: "bg-[#e6e6e6] text-[#555]", steps: ["done", "done", "done"] },
+    completed: { chip: "Completed", cls: "bg-green-100 text-green-800", steps: ["done", "done", "done"] },
     declined: { chip: "Declined", cls: "bg-red-100 text-red-700", steps: ["done", "todo", "todo"] },
-    cancelled: { chip: "Cancelled", cls: "bg-[#eeeeee] text-[#666]", steps: ["done", "todo", "todo"] },
+    cancelled: { chip: "Cancelled", cls: "bg-red-100 text-red-700", steps: ["done", "todo", "todo"] },
 };
 
 const FILTERS = [
@@ -37,6 +38,16 @@ const FILTERS = [
 
 // Mga appointment na tapos na (napupunta sa History)
 const FINISHED = ["completed", "declined", "cancelled"];
+
+// Oras kung kailan natapos ang session (local time ng browser)
+const endsAt = (a) => new Date(`${a.date}T${a.end_time}`);
+
+// Approved na pero lagpas na ang end time = tapos na ang session
+const isEnded = (a, now) => {
+    if (a.state !== "approved") return false;
+    const end = endsAt(a);
+    return !isNaN(end) && end <= now;
+};
 
 const fmtStamp = (iso) =>
     new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -82,6 +93,7 @@ const Header = ({ onMenu }) => {
                         <path d="M13.7 21a2 2 0 0 1-3.4 0" />
                     </svg>
                 </button>
+                <ProfileMenu size={37} />
             </div>
         </header>
     );
@@ -172,7 +184,7 @@ const StatusChip = ({ s, className = "" }) => (
     </span>
 );
 
-const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVerify, onViewConsent }) => {
+const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onVerify, onViewConsent }) => {
     const s = STATUS[a.state] || STATUS.pending;
     const d = new Date(a.date + "T00:00");
 
@@ -195,8 +207,10 @@ const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVer
                     </div>
 
                     {/* Detalye ng history */}
-                    {a.state === "completed" && a.completed_at && (
-                        <div className={`${serif} mt-[2px] text-[12px] text-[#666]`}>Completed on {fmtStamp(a.completed_at)}</div>
+                    {a.state === "completed" && (
+                        <div className={`${serif} mt-[2px] text-[12px] text-[#666]`}>
+                            Completed on {fmtStamp(a.completed_at || `${a.date}T00:00`)}
+                        </div>
                     )}
                     {a.state === "cancelled" && a.cancelled_at && (
                         <div className={`${serif} mt-[2px] text-[12px] text-[#666]`}>Cancelled by client on {fmtStamp(a.cancelled_at)}</div>
@@ -245,11 +259,6 @@ const AppointmentCard = ({ a, open, onToggle, busy, onApprove, onComplete, onVer
                     {a.state === "pending" && (
                         <PrimaryBtn disabled={busy} onClick={onApprove}>
                             {busy ? "Please wait…" : "Approve"}
-                        </PrimaryBtn>
-                    )}
-                    {a.state === "approved" && (
-                        <PrimaryBtn disabled={busy} onClick={onComplete}>
-                            {busy ? "Please wait…" : "Mark as done"}
                         </PrimaryBtn>
                     )}
                 </div>
@@ -332,6 +341,14 @@ export default function AffiliateAppointment() {
     const [busyId, setBusyId] = useState(null);
     const [viewing, setViewing] = useState(null);
 
+    // Kasalukuyang oras (nire-refresh kada 30 seconds para kusang lumipat sa History)
+    const [now, setNow] = useState(() => new Date());
+
+    useEffect(() => {
+        const t = setInterval(() => setNow(new Date()), 30000);
+        return () => clearInterval(t);
+    }, []);
+
     useEffect(() => {
         apiFetch(`${API_BASE}/appointments`)
             .then((d) => {
@@ -383,25 +400,39 @@ export default function AffiliateAppointment() {
             return next;
         });
 
+    // Hindi pa tapos vs. tapos na ang session
+    const upcoming = useMemo(() => items.filter((a) => !isEnded(a, now)), [items, now]);
+    const ended = useMemo(
+        () => items.filter((a) => isEnded(a, now)).map((a) => ({ ...a, state: "completed" })),
+        [items, now]
+    );
+
+    // History = galing sa backend + mga auto-ended (walang duplicate)
+    const historyAll = useMemo(() => {
+        const base = history || [];
+        const ids = new Set(base.map((a) => a.id));
+        return [...ended.filter((a) => !ids.has(a.id)), ...base];
+    }, [history, ended]);
+
     const counts = useMemo(() => {
         const c = {
-            all: items.filter((a) => !FINISHED.includes(a.state)).length,
-            history: historyCount,
+            all: upcoming.filter((a) => !FINISHED.includes(a.state)).length,
+            history: history !== null ? historyAll.length : historyCount + ended.length,
         };
         FILTERS.forEach(([k]) => {
-            if (k !== "all" && k !== "history") c[k] = items.filter((a) => a.state === k).length;
+            if (k !== "all" && k !== "history") c[k] = upcoming.filter((a) => a.state === k).length;
         });
         return c;
-    }, [items, historyCount]);
+    }, [upcoming, ended, history, historyAll, historyCount]);
 
     const visible = useMemo(() => {
         const q = query.trim().toLowerCase();
-        const source = filter === "history" ? history || [] : items;
+        const source = filter === "history" ? historyAll : upcoming;
         return source.filter((a) => {
             const byStatus = filter === "all" || filter === "history" || a.state === filter;
             return byStatus && (!q || (a.client_name || "").toLowerCase().includes(q));
         });
-    }, [items, history, filter, query]);
+    }, [upcoming, historyAll, filter, query]);
 
     const groups = useMemo(() => {
         const today = new Date();
@@ -514,7 +545,6 @@ export default function AffiliateAppointment() {
                                         onToggle={() => toggle(a.id)}
                                         busy={busyId === a.id}
                                         onApprove={() => act(a.id, "approve")}
-                                        onComplete={() => act(a.id, "complete")}
                                         onVerify={() => navigate(PAYMENT_PATH)}
                                         onViewConsent={() => setViewing(a)}
                                     />
@@ -529,7 +559,7 @@ export default function AffiliateAppointment() {
                                 ? query
                                     ? "No history matches your search."
                                     : "No history yet. Completed, declined, and cancelled appointments will show up here."
-                                : items.length === 0
+                                : upcoming.length === 0
                                     ? "No appointments yet. They appear here once a client has paid."
                                     : "No appointments match. Try another status or clear the search."}
                         </div>

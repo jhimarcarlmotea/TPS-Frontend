@@ -8,6 +8,7 @@ import StepRail from "./StepRail";
 import BookingSummary from "./BookingSummary";
 import { useBooking } from "./bookingContext";
 import SignaturePad from "../components/SignaturePad";
+import AbaConsentForm from "./AbaConsentForm";
 
 const pageShell = "font-sans text-black bg-tf-bg overflow-x-hidden antialiased";
 const mainPad = "py-12 pb-24 max-[720px]:py-7 max-[720px]:pb-16 bg-tf-bg";
@@ -213,6 +214,7 @@ export default function Consent() {
   const { update } = useBooking();
 
   const [pay, setPay] = useState(null);
+  const [prefill, setPrefill] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
 
@@ -254,7 +256,9 @@ export default function Consent() {
       .then((d) => {
         if (!alive) return;
         setPay(d.payment);
+        setPrefill(d.prefill || null);
         if (!d.payment) return;
+        if (d.payment.service_id === "aba") return;
 
         let draft = null;
         try {
@@ -297,7 +301,7 @@ export default function Consent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ABA / Assessment: walang consent form
+  // Assessment lang ang walang consent form.
   useEffect(() => {
     if (loaded && pay && !pay.required) navigate("/book/confirmation", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -305,7 +309,7 @@ export default function Consent() {
 
   // I-save ang draft
   useEffect(() => {
-    if (!draftKey || done || pay?.submitted) return;
+    if (!draftKey || done || pay?.submitted || pay?.service_id === "aba") return;
     try {
       sessionStorage.setItem(draftKey, JSON.stringify({ step, checks, intake, dsm, sign, guardian }));
     } catch {
@@ -501,7 +505,7 @@ export default function Consent() {
   } else if (!pay.approved) {
     body = (
       <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
-        The consent form opens after your psychologist approves your appointment.{" "}
+        The consent form opens after your appointment is approved.{" "}
         <Link to="/book/approval" className="font-bold text-tf-teal underline">
           Check approval status
         </Link>
@@ -511,13 +515,25 @@ export default function Consent() {
     body = (
       <div className="mt-6 rounded-xl border border-tf-teal/40 bg-tf-soft px-5 py-5 text-sm text-tf-ink">
         <strong className="font-serif text-base">
-          {done ? "Thank you. Your forms were submitted." : "You already submitted your forms."}
+          {done ? "Thank you. Your consent form was submitted." : "You already submitted your consent form."}
         </strong>
-        <p className="m-0 mt-1">Your psychologist can now see them. You may continue to your confirmation.</p>
+        <p className="m-0 mt-1">Your care team can now see it. You may continue to your confirmation.</p>
         <button type="button" className={`${btnSolid} mt-4`} onClick={() => navigate("/book/confirmation", { replace: true })}>
           Continue to confirmation
         </button>
       </div>
+    );
+  } else if (pay.service_id === "aba") {
+    body = (
+      <AbaConsentForm
+        paymentId={pay.id}
+        prefill={prefill}
+        onComplete={() => {
+          update({ consentComplete: true });
+          setDone(true);
+          setTimeout(() => navigate("/book/confirmation", { replace: true }), 1200);
+        }}
+      />
     );
   } else {
     body = (
@@ -1022,11 +1038,18 @@ export default function Consent() {
             <Reveal className={panelClass} delay={140}>
               <header>
                 <h2 className="m-0 mb-1.5 font-serif text-[1.4rem] font-normal text-[#202020]">
-                  Consent &amp; intake forms
+                  {!loaded
+                    ? "Loading consent form…"
+                    : pay?.service_id === "aba"
+                      ? "ABA consent form"
+                      : "Consent & intake forms"}
                 </h2>
                 <p className="m-0 text-sm text-[#666]">
-                  Please complete these forms now that your appointment has been approved. Your answers are
-                  confidential and only visible to your psychologist.
+                  {!loaded
+                    ? "Loading your booking details…"
+                    : pay?.service_id === "aba"
+                    ? "Please complete the ABA consent and service agreement now that your appointment has been approved. Your answers are confidential and visible to your care team."
+                    : "Please complete these forms now that your appointment has been approved. Your answers are confidential and only visible to your psychologist."}
                 </p>
               </header>
               {body}
@@ -1055,11 +1078,12 @@ export default function Consent() {
         >
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h3 id="leave-title" className="m-0 font-serif text-xl text-[#202020]">
-              Please complete your forms first
+              {pay?.service_id === "aba" ? "Please complete the ABA consent first" : "Please complete your forms first"}
             </h3>
             <p className="mb-0 mt-3 text-sm leading-relaxed text-[#555]">
-              The consent and intake forms are <strong>required</strong> before your appointment can
-              proceed. Please answer all of them so you can continue. Your answers are saved as you go.
+              {pay?.service_id === "aba"
+                ? <>The ABA consent form is <strong>required</strong> before your appointment can proceed. Your progress is saved as you go.</>
+                : <>The consent and intake forms are <strong>required</strong> before your appointment can proceed. Please answer all of them so you can continue. Your answers are saved as you go.</>}
             </p>
             <div className="mt-6 flex justify-end">
               <button type="button" className={btnSolid} onClick={() => setLeaveWarn(false)}>

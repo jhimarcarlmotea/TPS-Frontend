@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import AdminNavigation from "./adminnavigation";
 import ProfileMenu from "../components/ProfileMenu";
+import { apiFetch } from "../auth";
 import { getHomeContent, saveHomeContent, uploadHomeImage } from "./homeApi";
 import { DEFAULT_HOME_CONTENT, mergeHomeContent } from "../data/homeDefaults";
 
@@ -12,6 +13,8 @@ const MAX_IMAGE_MB = 2;
 const STEP_ICONS = ["select", "calendar", "connect", "sprout"];
 const SERVICE_ICONS = ["chat", "blocks", "check"];
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+const EMPTY_ABOUT = { headline: "", intro: "", members: [] };
 
 // 16px sa mobile para hindi mag-zoom ang iOS kapag nag-focus sa input
 const inputCls = `${inter} w-full min-w-0 rounded-[6px] border border-[#c7b6b6] bg-white px-[12px] text-[16px] sm:text-[13px] text-[#202020] outline-none focus:border-[#4a9b8e] focus:ring-2 focus:ring-[#4a9b8e]/25`;
@@ -99,21 +102,6 @@ function ListEditor({ items, onChange, min = 1, max = 8, addLabel, makeNew, labe
     );
 }
 
-/** Tags na comma-separated; kino-commit pag nag-blur. */
-function TagsField({ value, onCommit }) {
-    const [text, setText] = useState(value.join(", "));
-    useEffect(() => { setText(value.join(", ")); }, [value.join("|")]); // eslint-disable-line
-    return (
-        <input
-            className={inputH}
-            value={text}
-            placeholder="Psychotherapy, Counseling, Anxiety"
-            onChange={(e) => setText(e.target.value)}
-            onBlur={() => onCommit(text.split(",").map((t) => t.trim()).filter(Boolean))}
-        />
-    );
-}
-
 function PhotoField({ value, onChange, notify }) {
     const ref = useRef(null);
     const [busy, setBusy] = useState(false);
@@ -145,14 +133,95 @@ function PhotoField({ value, onChange, notify }) {
     );
 }
 
+/** Mga taong lalabas sa About page. Awtomatiko galing sa admin at affiliate accounts. */
+function AboutPeople({ members, onChange }) {
+    const patch = (id, p) => onChange(members.map((m) => (m.user_id === id ? { ...m, ...p } : m)));
+    const move = (i, d) => {
+        const j = i + d;
+        if (j < 0 || j >= members.length) return;
+        const next = [...members];
+        [next[i], next[j]] = [next[j], next[i]];
+        onChange(next);
+    };
+    const initials = (m) => `${(m.first_name || "").charAt(0)}${(m.last_name || "").charAt(0)}`.toUpperCase() || "T";
+
+    if (members.length === 0) {
+        return <p className={`${serif} text-[13px] text-[#666]`}>No admin or affiliate accounts yet. They will appear here once they exist.</p>;
+    }
+
+    return (
+        <div className="flex flex-col gap-[14px]">
+            {members.map((m, i) => (
+                <div
+                    key={m.user_id}
+                    className={`rounded-[8px] border border-[#e8e8e8] p-3 sm:p-[16px] ${m.visible ? "bg-white" : "bg-[#fafafa]"}`}
+                >
+                    <div className="flex flex-col gap-[12px] sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-center gap-[12px]">
+                            {m.avatar_url ? (
+                                <img src={m.avatar_url} alt="" className="h-[44px] w-[44px] shrink-0 rounded-full object-cover" />
+                            ) : (
+                                <span className={`${serif} grid h-[44px] w-[44px] shrink-0 place-items-center rounded-full bg-[#cfe4dc] text-[15px] text-[#214f44]`}>
+                                    {initials(m)}
+                                </span>
+                            )}
+                            <div className="min-w-0">
+                                <div className={`${serif} truncate text-[14px] font-bold text-[#202020]`}>{m.name}</div>
+                                <div className={`${inter} text-[11px] text-[#666]`}>{m.role === "ADMIN" ? "Admin account" : "Affiliate account"}</div>
+                            </div>
+                        </div>
+                        <div className="flex shrink-0 gap-[6px]">
+                            <SmallBtn disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up">↑</SmallBtn>
+                            <SmallBtn disabled={i === members.length - 1} onClick={() => move(i, 1)} aria-label="Move down">↓</SmallBtn>
+                        </div>
+                    </div>
+
+                    <div className="mt-[14px] grid grid-cols-1 gap-[12px] md:grid-cols-[1fr_auto] md:items-end">
+                        <Field label="Title shown to clients" hint="Leave blank to hide the title on the About page.">
+                            <input
+                                className={inputH}
+                                maxLength={80}
+                                value={m.title}
+                                onChange={(e) => patch(m.user_id, { title: e.target.value })}
+                            />
+                        </Field>
+                        <label className={`${serif} flex h-[38px] cursor-pointer items-center gap-[8px] text-[13px] text-[#202020]`}>
+                            <input
+                                type="checkbox"
+                                className="h-[16px] w-[16px] accent-[#11a086]"
+                                checked={m.visible}
+                                onChange={(e) => patch(m.user_id, { visible: e.target.checked })}
+                            />
+                            Show on About page
+                        </label>
+                    </div>
+
+                    <div className="mt-[12px] rounded-[6px] bg-[#f1f6f3] px-[12px] py-[10px]">
+                        <p className={`${inter} m-0 text-[11px] font-bold text-[#666]`}>Background (from their Profile)</p>
+                        {m.background ? (
+                            <p className={`${serif} m-0 mt-[4px] line-clamp-3 whitespace-pre-line text-[12px] leading-[1.5] text-[#444]`}>{m.background}</p>
+                        ) : (
+                            <p className={`${serif} m-0 mt-[4px] text-[12px] italic text-[#666]`}>No background yet. They can add one in their Profile.</p>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
-const TABS = ["Hero", "How it works", "Services", "Team", "Stories", "FAQ", "Contact"];
+const TABS = ["Hero", "How it works", "Services", "About", "FAQ", "Contact"];
 
 export default function AdminHome() {
     const [content, setContent] = useState(DEFAULT_HOME_CONTENT);
     const [saved, setSaved] = useState(JSON.stringify(DEFAULT_HOME_CONTENT));
+    const [about, setAbout] = useState(EMPTY_ABOUT);
+    const [savedAbout, setSavedAbout] = useState(JSON.stringify(EMPTY_ABOUT));
+    const [aboutDefaults, setAboutDefaults] = useState({ headline: "", intro: "" });
+    const [aboutError, setAboutError] = useState("");
     const [tab, setTab] = useState("Hero");
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState("");
@@ -167,19 +236,30 @@ export default function AdminHome() {
     const load = async () => {
         setLoading(true);
         setLoadError("");
+        setAboutError("");
         try {
             const merged = mergeHomeContent(await getHomeContent());
             setContent(merged);
             setSaved(JSON.stringify(merged));
         } catch (e) {
             setLoadError(e.message);
-        } finally {
-            setLoading(false);
         }
+        // Hiwalay ang About para hindi ma-block ang buong page kapag nagka-error dito
+        try {
+            const d = await apiFetch("/admin/about-team");
+            const next = { headline: d.about.headline, intro: d.about.intro, members: d.members || [] };
+            setAbout(next);
+            setSavedAbout(JSON.stringify(next));
+            setAboutDefaults(d.defaults || { headline: "", intro: "" });
+        } catch (e) {
+            setAboutError(e.message || "Could not load the About page settings.");
+        }
+        setLoading(false);
     };
     useEffect(() => { load(); }, []);
 
-    const dirty = JSON.stringify(content) !== saved;
+    const aboutReady = !aboutError;
+    const dirty = JSON.stringify(content) !== saved || (aboutReady && JSON.stringify(about) !== savedAbout);
     useEffect(() => {
         if (!dirty) return;
         const h = (e) => { e.preventDefault(); e.returnValue = ""; };
@@ -192,7 +272,7 @@ export default function AdminHome() {
 
     /* ---- validation, per tab ---- */
     const errors = useMemo(() => {
-        const { hero, steps, services, team, stories, faqs, contact } = content;
+        const { hero, steps, services, faqs, contact } = content;
         const e = {};
         e.Hero = [
             !hero.headline.trim() && "Headline is required.",
@@ -200,8 +280,12 @@ export default function AdminHome() {
         ].filter(Boolean);
         e["How it works"] = steps.some((s) => !s.title.trim() || !s.text.trim()) ? ["Every step needs a title and description."] : [];
         e.Services = services.some((s) => !s.title.trim() || !s.text.trim()) ? ["Every service needs a title and description."] : [];
-        e.Team = team.some((m) => !m.name.trim() || !m.role.trim() || !m.bio.trim()) ? ["Every team member needs a name, role, and bio."] : [];
-        e.Stories = stories.some((s) => !s.who.trim() || !s.text.trim()) ? ["Every story needs a name or initials and the story text."] : [];
+        e.About = aboutReady
+            ? [
+                !about.headline.trim() && "The About page headline is required.",
+                about.members.some((m) => m.title.length > 80) && "Titles can be up to 80 characters.",
+            ].filter(Boolean)
+            : [];
         e.FAQ = faqs.some((f) => !f.q.trim() || !f.a.trim()) ? ["Every FAQ needs a question and an answer."] : [];
         e.Contact = [
             !/\S+@\S+\.\S+/.test(contact.email) && "Enter a valid email.",
@@ -210,17 +294,32 @@ export default function AdminHome() {
             contact.facebook && !/^https?:\/\//.test(contact.facebook) && "Facebook link must start with https://",
         ].filter(Boolean);
         return e;
-    }, [content]);
+    }, [content, about, aboutReady]);
     const totalErrors = Object.values(errors).reduce((n, l) => n + l.length, 0);
     const valid = totalErrors === 0;
 
     const save = async () => {
         setSaving(true);
         try {
-            const res = await saveHomeContent(content);
+            const payload = aboutReady
+                ? {
+                    ...content,
+                    about: {
+                        headline: about.headline.trim(),
+                        intro: about.intro.trim(),
+                        members: about.members.map((m) => ({
+                            user_id: m.user_id,
+                            title: m.title.trim(),
+                            visible: m.visible,
+                        })),
+                    },
+                }
+                : content;
+            const res = await saveHomeContent(payload);
             const next = mergeHomeContent(res || content);
             setContent(next);
             setSaved(JSON.stringify(next));
+            if (aboutReady) setSavedAbout(JSON.stringify(about));
             notify("Home page updated");
         } catch (e) {
             notify(`Couldn't save: ${e.message}`, true);
@@ -230,16 +329,20 @@ export default function AdminHome() {
     };
 
     const discard = () => {
-        if (window.confirm("Discard all unsaved changes?")) setContent(JSON.parse(saved));
+        if (window.confirm("Discard all unsaved changes?")) {
+            setContent(JSON.parse(saved));
+            setAbout(JSON.parse(savedAbout));
+        }
     };
 
     const resetDefaults = () => {
         if (window.confirm("Reset all home page content to the original text? You can still discard this before saving.")) {
             setContent(mergeHomeContent(null));
+            if (aboutReady) setAbout((a) => ({ ...a, headline: aboutDefaults.headline, intro: aboutDefaults.intro }));
         }
     };
 
-    const { hero, steps, services, team, stories, faqs, contact } = content;
+    const { hero, steps, services, faqs, contact } = content;
     const tabErrors = errors[tab];
 
     return (
@@ -255,7 +358,7 @@ export default function AdminHome() {
                     <div>
                         <div className={`${inter} text-[14px] font-bold tracking-[4.2px] text-[#4a9b8e] sm:text-[20px]`}>HOME</div>
                         <h1 className={`${serif} mt-[8px] text-[30px] font-bold leading-[1.15] text-[#2f4a42] sm:text-[40px]`}>Manage home page</h1>
-                        <p className={`${serif} mt-[4px] text-[14px] text-[#666]`}>Edit what clients see on the Client Site home page, section by section.</p>
+                        <p className={`${serif} mt-[4px] text-[14px] text-[#666]`}>Edit what clients see on the Client Site home and About pages, section by section.</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-[17px] gap-y-2">
                         <button onClick={resetDefaults} className={`${serif} text-[12px] text-[#666] underline hover:text-black`}>Reset to original text</button>
@@ -380,43 +483,40 @@ export default function AdminHome() {
                                 </Card>
                             )}
 
-                            {tab === "Team" && (
-                                <Card title="Team" hint="The people behind your care. Order here is the order of the tabs on the home page.">
-                                    <ListEditor
-                                        items={team} onChange={setList("team")} min={1} max={8}
-                                        label="Member" addLabel="Add team member" makeNew={{ name: "", role: "", focus: "", quote: "", bio: "", tags: [] }}
-                                        preview={(m) => m.name}
-                                    >
-                                        {(m, patch) => (
-                                            <>
-                                                <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
-                                                    <Field label="Name"><input className={inputH} value={m.name} onChange={(e) => patch({ name: e.target.value })} /></Field>
-                                                    <Field label="Role"><input className={inputH} value={m.role} onChange={(e) => patch({ role: e.target.value })} /></Field>
-                                                </div>
-                                                <Field label="Short quote"><input className={inputH} value={m.quote} onChange={(e) => patch({ quote: e.target.value })} /></Field>
-                                                <Field label="Bio"><textarea rows={4} className={areaCls} value={m.bio} onChange={(e) => patch({ bio: e.target.value })} /></Field>
-                                                <Field label="Works with" hint="Separate with commas."><TagsField value={m.tags} onCommit={(tags) => patch({ tags })} /></Field>
-                                            </>
-                                        )}
-                                    </ListEditor>
-                                </Card>
-                            )}
+                            {tab === "About" && (
+                                <>
+                                    {aboutError && (
+                                        <div className="rounded-[10px] border border-[#ff4c4c75] bg-white p-4 sm:p-[24px]">
+                                            <p className={`${serif} text-[14px] text-[#b3382a]`}>Couldn't load the About page settings: {aboutError}</p>
+                                            <button onClick={load} className={`${serif} mt-[12px] h-[34px] rounded-[6px] bg-[#11a086] px-[16px] text-[13px] text-white hover:bg-[#0e8c75]`}>Try again</button>
+                                        </div>
+                                    )}
 
-                            {tab === "Stories" && (
-                                <Card title="Stories" hint="Only publish stories you have the client's permission to share, and use initials instead of full names.">
-                                    <ListEditor
-                                        items={stories} onChange={setList("stories")} min={1} max={8}
-                                        label="Story" addLabel="Add story" makeNew={{ who: "", text: "" }}
-                                        preview={(s) => s.who}
-                                    >
-                                        {(s, patch) => (
-                                            <>
-                                                <Field label="Name or initials"><input className={`${inputH} sm:max-w-[200px]`} value={s.who} onChange={(e) => patch({ who: e.target.value })} /></Field>
-                                                <Field label="Story"><textarea rows={3} className={areaCls} value={s.text} onChange={(e) => patch({ text: e.target.value })} /></Field>
-                                            </>
-                                        )}
-                                    </ListEditor>
-                                </Card>
+                                    {aboutReady && (
+                                        <>
+                                            <Card title="About page intro" hint="The opening text on the About page. Shown at the top, next to the book button.">
+                                                <div className="flex flex-col gap-[14px]">
+                                                    <Field label="Headline">
+                                                        <input className={inputH} maxLength={160} value={about.headline} onChange={(e) => setAbout((a) => ({ ...a, headline: e.target.value }))} />
+                                                    </Field>
+                                                    <Field label="Introduction">
+                                                        <textarea rows={4} maxLength={800} className={areaCls} value={about.intro} onChange={(e) => setAbout((a) => ({ ...a, intro: e.target.value }))} />
+                                                    </Field>
+                                                </div>
+                                            </Card>
+
+                                            <Card
+                                                title="The people behind your care"
+                                                hint="Added automatically from admin and affiliate accounts. Name, photo, and background come from each person's own Profile. Here you set the title clients see, who is shown, and the order."
+                                            >
+                                                <AboutPeople
+                                                    members={about.members}
+                                                    onChange={(members) => setAbout((a) => ({ ...a, members }))}
+                                                />
+                                            </Card>
+                                        </>
+                                    )}
+                                </>
                             )}
 
                             {tab === "FAQ" && (

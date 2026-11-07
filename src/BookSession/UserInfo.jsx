@@ -194,6 +194,7 @@ export default function UserInfo() {
 
   const summaryRows = [
     { label: "SERVICE", value: service?.name || "—" },
+    ...(booking.serviceId === "assessment" && booking.assessmentType?.name ? [{ label: "TYPE", value: booking.assessmentType.name }] : []),
     {
       label: "PSYCHOLOGIST",
       value:

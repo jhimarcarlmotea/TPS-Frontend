@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminNavigation from "./adminnavigation";
+import ProfileMenu from "../components/ProfileMenu";
 import { apiFetch } from "../auth";
 import { peso, resizeToJpeg } from "../components/payUtils";
 
@@ -8,11 +9,8 @@ const FONT_CSS = `@import url('https://fonts.googleapis.com/css2?family=Inknut+A
 const inter = "font-['Inter',Helvetica,sans-serif]";
 const serif = "font-['Inria_Serif',Georgia,serif]";
 
-const SERVICE_TABS = [
-    ["psychotherapy", "Psychotherapy"],
-    ["aba", "ABA Therapy"],
-    ["assessment", "Assessment"],
-];
+/* Route of the Manage services admin page */
+const ADMIN_SERVICES_PATH = "/admin/services";
 
 const Card = ({ className = "", children }) => (
     <section className={`relative rounded-[10px] border border-[#c7b6b6] bg-white ${className}`}>{children}</section>
@@ -29,12 +27,10 @@ const Toggle = ({ on, onChange, label, disabled }) => (
         aria-label={label}
         disabled={disabled}
         onClick={() => onChange(!on)}
-        className={`relative h-[26px] w-[50px] shrink-0 cursor-pointer rounded-full transition-colors disabled:opacity-60 ${on ? "bg-[#2a8570]" : "bg-[#989898]"
-            }`}
+        className={`relative h-[26px] w-[50px] shrink-0 cursor-pointer rounded-full transition-colors disabled:opacity-60 ${on ? "bg-[#2a8570]" : "bg-[#989898]"}`}
     >
         <span
-            className={`absolute top-[4px] h-[18px] w-[19px] rounded-full bg-white transition-all ${on ? "left-[27px]" : "left-[4px]"
-                }`}
+            className={`absolute top-[4px] h-[18px] w-[19px] rounded-full bg-white transition-all ${on ? "left-[27px]" : "left-[4px]"}`}
         />
     </button>
 );
@@ -55,26 +51,69 @@ function Notice({ msg }) {
 }
 
 /* ---------------- Pricing + downpayment ---------------- */
-function PricingCard({ settings, onSaved }) {
-    const [tab, setTab] = useState("psychotherapy");
-    const [percent, setPercent] = useState(String(settings.downpayment_percent));
+function PricingCard({ settings, onSaved, onOpenServices }) {
+    // Services (excluding assessment, which has pricing per assessment type)
+    const servicesList = (settings.services || [
+        { id: "psychotherapy", name: "Psychotherapy" },
+        { id: "aba", name: "ABA Therapy" },
+    ]).filter((s) => s.id !== "assessment");
+
+    const assessmentTypesList = settings.assessment_types || [];
+
+    // Category: "services" | "assessment"
+    const [category, setCategory] = useState("services");
+
+    const [serviceTab, setServiceTab] = useState(() => servicesList[0]?.id || "psychotherapy");
+    const [atTab, setAtTab] = useState(() => (assessmentTypesList[0]?.id ? String(assessmentTypesList[0].id) : ""));
+
+    const [percent, setPercent] = useState(String(settings.downpayment_percent ?? 50));
     const [note, setNote] = useState(settings.note || "");
-    const [prices, setPrices] = useState(
-        Object.fromEntries(Object.entries(settings.prices).map(([k, v]) => [k, String(v)]))
+    const [prices, setPrices] = useState(() =>
+        Object.fromEntries(
+            Object.entries(settings.prices || {})
+                .filter(([k]) => k !== "assessment")
+                .map(([k, v]) => [k, String(v)])
+        )
     );
+    const [atPrices, setAtPrices] = useState(() =>
+        Object.fromEntries(
+            Object.entries(settings.assessment_prices || {}).map(([k, v]) => [String(k), String(v)])
+        )
+    );
+
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState(null);
 
-    const price = Number(prices[tab]) || 0;
+    const isServices = category === "services";
+
+    // Current service or assessment type being priced
+    const currentService = servicesList.find((s) => s.id === serviceTab) || servicesList[0];
+    const currentAt = assessmentTypesList.find((t) => String(t.id) === String(atTab)) || assessmentTypesList[0];
+
+    const currentPrice = isServices
+        ? Number(prices[currentService?.id]) || 0
+        : Number(atPrices[currentAt?.id]) || 0;
+
     const pct = Number(percent) || 0;
-    const down = Math.round(price * pct) / 100;
-    const fullOnly = (settings.full_only || []).includes(tab);
+    const down = Math.round(currentPrice * pct) / 100;
+    const fullOnly = isServices && (settings.full_only || []).includes(currentService?.id);
+
     const save = async () => {
         setMsg(null);
-        if (!(pct >= 1 && pct <= 100)) return setMsg({ type: "err", text: "Downpayment must be 1 to 100 percent." });
-        for (const [id, label] of SERVICE_TABS) {
-            if (!(Number(prices[id]) >= 1)) return setMsg({ type: "err", text: `Set a price for ${label}.` });
+        if (!(pct >= 1 && pct <= 100)) {
+            return setMsg({ type: "err", text: "Downpayment must be 1 to 100 percent." });
         }
+        for (const s of servicesList) {
+            if (!(Number(prices[s.id]) >= 1)) {
+                return setMsg({ type: "err", text: `Set a price for ${s.name}.` });
+            }
+        }
+        for (const t of assessmentTypesList) {
+            if (!(Number(atPrices[t.id]) >= 1)) {
+                return setMsg({ type: "err", text: `Set a price for assessment type: ${t.name}.` });
+            }
+        }
+
         setBusy(true);
         try {
             const d = await apiFetch("/admin/payment-settings", {
@@ -82,11 +121,18 @@ function PricingCard({ settings, onSaved }) {
                 body: JSON.stringify({
                     downpayment_percent: pct,
                     note: note.trim() || null,
-                    prices: Object.fromEntries(Object.entries(prices).map(([k, v]) => [k, Number(v)])),
+                    prices: Object.fromEntries(
+                        Object.entries(prices)
+                            .filter(([k]) => k !== "assessment")
+                            .map(([k, v]) => [k, Number(v)])
+                    ),
+                    assessment_prices: Object.fromEntries(
+                        Object.entries(atPrices).map(([k, v]) => [k, Number(v)])
+                    ),
                 }),
             });
             onSaved(d);
-            setMsg({ type: "ok", text: "Saved. Clients will see these prices right away." });
+            setMsg({ type: "ok", text: "Saved. The new prices now show on the Services page and when clients book." });
         } catch (err) {
             setMsg({ type: "err", text: err.message });
         } finally {
@@ -98,37 +144,144 @@ function PricingCard({ settings, onSaved }) {
         <Card className="p-[16px]">
             <CardTitle>Service prices &amp; payment terms</CardTitle>
             <p className={`${serif} text-[11px] text-black`}>
-                Set how much clients pay for each service and how much to hold a slot.
+                Set how much clients pay for each service and assessment type. These prices are the ones
+                shown on the Services page and booking.
             </p>
 
-            <div className="mt-[12px] inline-flex rounded-[11px] bg-[#4a9b8e30] p-[3px]">
-                {SERVICE_TABS.map(([id, label]) => (
-                    <button
-                        key={id}
-                        type="button"
-                        onClick={() => setTab(id)}
-                        className={`${serif} h-[24px] cursor-pointer rounded-[9px] border-0 px-[12px] text-[11px] text-[#202020] ${tab === id ? "bg-white font-bold" : "bg-transparent"
-                            }`}
-                    >
-                        {label}
-                    </button>
-                ))}
+            {/* Category Switcher: Services vs Assessment Types */}
+            <div className="mt-[14px] flex gap-[8px] border-b border-[#e5e5e5] pb-[10px]">
+                <button
+                    type="button"
+                    onClick={() => setCategory("services")}
+                    className={`${serif} cursor-pointer rounded-[6px] border px-[12px] py-[4px] text-[12px] font-bold transition-colors ${isServices
+                        ? "border-[#4a9b8e] bg-[#4a9b8e] text-white"
+                        : "border-[#c7b6b6] bg-white text-[#555] hover:bg-[#f2f2f2]"
+                        }`}
+                >
+                    Services ({servicesList.length})
+                </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setCategory("assessment");
+                        if (!atTab && assessmentTypesList[0]?.id) {
+                            setAtTab(String(assessmentTypesList[0].id));
+                        }
+                    }}
+                    className={`${serif} cursor-pointer rounded-[6px] border px-[12px] py-[4px] text-[12px] font-bold transition-colors ${!isServices
+                        ? "border-[#4a9b8e] bg-[#4a9b8e] text-white"
+                        : "border-[#c7b6b6] bg-white text-[#555] hover:bg-[#f2f2f2]"
+                        }`}
+                >
+                    Assessment Types ({assessmentTypesList.length})
+                </button>
             </div>
 
-            <label className={`${serif} mt-[14px] block text-[11px] text-[#666]`}>
-                Session fee ({SERVICE_TABS.find(([id]) => id === tab)[1]})
-            </label>
-            <div className="relative">
-                <span className="absolute left-[10px] top-[14px] text-[12px] text-[#666]">₱</span>
-                <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={prices[tab]}
-                    onChange={(e) => setPrices({ ...prices, [tab]: e.target.value })}
-                    className={`${fieldCls} pl-[24px]`}
-                />
-            </div>
+            {/* If in Services category */}
+            {isServices && (
+                <>
+                    <div className="mt-[12px] flex flex-wrap gap-[4px] rounded-[11px] bg-[#4a9b8e30] p-[3px]">
+                        {servicesList.map((s) => (
+                            <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => setServiceTab(s.id)}
+                                className={`${serif} h-[24px] cursor-pointer rounded-[9px] border-0 px-[12px] text-[11px] text-[#202020] ${serviceTab === s.id ? "bg-white font-bold shadow-sm" : "bg-transparent"
+                                    }`}
+                            >
+                                {s.name}
+                            </button>
+                        ))}
+                    </div>
+
+                    {currentService && (
+                        <>
+                            <label className={`${serif} mt-[14px] block text-[11px] text-[#666]`}>
+                                Session fee ({currentService.name})
+                            </label>
+                            <div className="relative">
+                                <span className="absolute left-[10px] top-[14px] text-[12px] text-[#666]">₱</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={prices[currentService.id] || ""}
+                                    onChange={(e) => setPrices({ ...prices, [currentService.id]: e.target.value })}
+                                    className={`${fieldCls} pl-[24px]`}
+                                />
+                            </div>
+                        </>
+                    )}
+                </>
+            )}
+
+            {/* If in Assessment Types category */}
+            {!isServices && (
+                <>
+                    {assessmentTypesList.length === 0 ? (
+                        <div className="mt-[14px] rounded-[8px] border border-dashed border-[#c7b6b6] bg-[#fafafa] p-[16px] text-center">
+                            <p className={`${serif} m-0 text-[12px] text-[#666]`}>
+                                No assessment types found. Add assessment types in{" "}
+                                <button
+                                    type="button"
+                                    onClick={onOpenServices}
+                                    className="cursor-pointer border-0 bg-transparent p-0 text-[#2a8570] underline"
+                                >
+                                    Manage services
+                                </button>
+                                , then come back here to set their prices.
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="mt-[12px] flex flex-wrap gap-[4px] rounded-[11px] bg-[#4a9b8e30] p-[3px]">
+                                {assessmentTypesList.map((t) => (
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => setAtTab(String(t.id))}
+                                        className={`${serif} h-[24px] cursor-pointer rounded-[9px] border-0 px-[12px] text-[11px] text-[#202020] ${String(atTab) === String(t.id) ? "bg-white font-bold shadow-sm" : "bg-transparent"
+                                            }`}
+                                    >
+                                        {t.name}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {currentAt && (
+                                <>
+                                    <label className={`${serif} mt-[14px] block text-[11px] text-[#666]`}>
+                                        Fee for Assessment Type: <strong>{currentAt.name}</strong> ({currentAt.hours || round1(currentAt.duration_minutes / 60)} hr)
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-[10px] top-[14px] text-[12px] text-[#666]">₱</span>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            value={atPrices[currentAt.id] || ""}
+                                            onChange={(e) => setAtPrices({ ...atPrices, [currentAt.id]: e.target.value })}
+                                            className={`${fieldCls} pl-[24px]`}
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </>
+                    )}
+                </>
+            )}
+
+            <p className={`${serif} mt-[6px] text-[11px] text-[#666]`}>
+                Session length, details, and assessment types are edited in{" "}
+                <button
+                    type="button"
+                    onClick={onOpenServices}
+                    className={`${serif} cursor-pointer border-0 bg-transparent p-0 text-[11px] text-[#2a8570] underline`}
+                >
+                    Manage services
+                </button>
+                .
+            </p>
 
             {fullOnly ? null : (
                 <>
@@ -143,8 +296,8 @@ function PricingCard({ settings, onSaved }) {
                         className={fieldCls}
                     />
                     <p className={`${serif} mt-[6px] text-[11px] text-[#2a8570]`}>
-                        Client pays {peso(down)} now, balance {peso(price - down)}. Set 100 to require full payment only.
-                        The downpayment percent applies to Psychotherapy and Assessment.
+                        Client pays {peso(down)} now, balance {peso(Math.max(0, currentPrice - down))}. Set 100 to require full payment only.
+                        The downpayment percent applies to Psychotherapy, Assessment Types, and custom services.
                     </p>
                 </>
             )}
@@ -169,6 +322,10 @@ function PricingCard({ settings, onSaved }) {
             </button>
         </Card>
     );
+}
+
+function round1(n) {
+    return Math.round(n * 10) / 10;
 }
 
 /* ---------------- Add method ---------------- */
@@ -506,8 +663,11 @@ export default function PaymentMethods() {
                             Set the fee for each service, the downpayment percent, and where clients should send their money.
                         </p>
                     </div>
-                    <div className="flex h-[30px] w-[190px] items-center justify-center rounded-[6px] border border-[#4a9b8e] bg-[#e3f2ee]">
-                        <span className={`${inter} text-[12px] font-bold text-[#2a8570]`}>{todayLabel}</span>
+                    <div className="flex items-center gap-[17px]">
+                        <div className="flex h-[30px] w-[190px] items-center justify-center rounded-[6px] border border-[#4a9b8e] bg-[#e3f2ee]">
+                            <span className={`${inter} text-[12px] font-bold text-[#2a8570]`}>{todayLabel}</span>
+                        </div>
+                        <ProfileMenu size={37} />
                     </div>
                 </header>
 
@@ -532,7 +692,11 @@ export default function PaymentMethods() {
                 {settings && (
                     <>
                         <div className="mt-[16px] grid grid-cols-2 items-start gap-[24px] max-[1100px]:grid-cols-1">
-                            <PricingCard settings={settings} onSaved={setSettings} />
+                            <PricingCard
+                                settings={settings}
+                                onSaved={setSettings}
+                                onOpenServices={() => navigate(ADMIN_SERVICES_PATH)}
+                            />
                             <AddMethod onAdded={(m) => setMethods((l) => [...l, m])} />
                         </div>
 

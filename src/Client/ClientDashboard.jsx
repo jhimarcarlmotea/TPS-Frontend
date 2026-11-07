@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { Navbar, Footer, Reveal, SectionHead, Photo, btnSolid } from "../components/Layout";
 import { CLINIC } from "../data/clinic";
 import { useHomeContent } from "../data/useHomecontent";
-import TherapistProfileModal from "../components/TherapistProfileModal";
 
 const ICONS = {
   select: <><rect x="14" y="10" width="36" height="46" rx="5" /><path d="M24 24h16M24 34h16M24 44h10" /></>,
@@ -71,45 +70,6 @@ const Dots = ({ className = "" }) => (
     <circle cx="26" cy="50" r="2.2" fill="#4a9b8e" opacity="0.7" />
     <circle cx="50" cy="46" r="1.6" fill="#4a9b8e" opacity="0.5" />
     <path d="M42 22v6M39 25h6" stroke="#4a9b8e" strokeWidth="1" opacity="0.6" strokeLinecap="round" />
-  </svg>
-);
-
-const PaleCircle = ({ className = "" }) => (
-  <svg className={`${decoBase} ${className}`} viewBox="0 0 100 100" aria-hidden="true">
-    <circle cx="50" cy="50" r="50" fill="#cfe4dc" opacity="0.55" />
-  </svg>
-);
-
-const HeadHeart = ({ className = "" }) => (
-  <svg className={`${decoBase} ${className}`} viewBox="0 0 260 260" fill="none" aria-hidden="true">
-    <path
-      d="M40 150C20 110 40 50 100 32c50-14 100 6 112 52 6 24-2 40-8 52l14 22-16 6 2 16-18 4c-2 22-16 34-34 36v26H88v-40c-20-10-36-24-48-56z"
-      fill="#e3efe9"
-      opacity="0.8"
-    />
-    <path
-      d="M52 150C34 112 50 62 104 46c46-12 90 6 100 48 5 22-2 36-8 48l12 20-14 5 2 14-16 4c-2 20-14 30-30 32v28"
-      stroke="#2a6a53"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-    />
-    <path
-      d="M112 118s-26-16-26-36a14 14 0 0 1 26-6 14 14 0 0 1 26 6c0 20-26 36-26 36z"
-      stroke="#2a6a53"
-      strokeWidth="1.6"
-      fill="#aac6b7"
-      fillOpacity="0.5"
-    />
-    <path d="M70 90c10-18 30-26 46-22M130 70c14 2 26 12 30 26" stroke="#2a6a53" strokeWidth="1.2" strokeLinecap="round" />
-    <path d="M20 250C40 210 60 190 90 176" stroke="#2a6a53" strokeWidth="1.4" strokeLinecap="round" />
-    {[
-      [32, 232, -50, "#7bb4ab"],
-      [48, 212, -20, "#aac6b7"],
-      [64, 196, -60, "#4a9b8e"],
-      [78, 184, -15, "#7bb4ab"],
-    ].map(([x, y, r, c], idx) => (
-      <path key={idx} transform={`translate(${x} ${y}) rotate(${r}) scale(1.2)`} d={LEAF} fill={c} opacity="0.85" />
-    ))}
   </svg>
 );
 
@@ -211,18 +171,6 @@ const SERVICES = [
   { icon: "check", photo: "service-3.png", meta: "1 Hour Comprehensive Review", title: "Assessment & Consultation", text: "A thorough initial review and diagnostic structured interview. This provides a holistic understanding of your unique mental health landscape, allowing us to recommend highly tailored, effective approaches just for you." },
 ];
 
-const TEAM = [
-  { name: "Dr. Maria Santos", role: "Clinical Psychologist", focus: "Psychotherapy", quote: "A safe space to understand yourself, heal, and grow at your own pace.", bio: "I believe that healing begins when you feel safe, heard, and understood. My goal is to provide a supportive space where you can explore your emotions, overcome challenges, and work toward a healthier and more balanced life.", tags: ["Psychotherapy", "Counseling", "Anxiety"] },
-  { name: "Dr. Juan Dela Cruz", role: "Psychotherapist", focus: "Counseling", quote: "Change starts with being heard — we move at a pace that feels right for you.", bio: "I work with adults navigating stress, relationships, and life transitions. Sessions focus on practical tools and a collaborative therapeutic relationship.", tags: ["Psychotherapy", "Counseling", "Relationships"] },
-  { name: "Dr. Ana Reyes", role: "Behavioral Specialist", focus: "ABA Therapy", quote: "Small, consistent steps create lasting growth for children and families.", bio: "I specialize in Applied Behavior Analysis for children and teens, partnering with families to build communication, social, and daily living skills.", tags: ["ABA Therapy", "Child & Teen", "Parent coaching"] },
-];
-
-const STORIES = [
-  { who: "M.C", text: "I felt heard and understood without being judged. The sessions helped me understand my emotions better and gave me confidence in handling life's challenges." },
-  { who: "M.C", text: "The experience made me feel comfortable opening up about things I usually keep to myself. I learned to be kinder to myself and take things one step at a time." },
-  { who: "M.C", text: "I appreciate having a safe space where I can talk freely. The guidance helped me reflect on my experiences and find healthier ways to cope with stress." },
-];
-
 const FAQS = [
   { q: "Is everything I share confidential?", a: "Yes. Your sessions are private and handled according to professional ethics and applicable privacy laws. Limits to confidentiality are explained before your first session." },
   { q: "Do you offer online and in-person sessions?", a: "Yes. You can choose a virtual or an in-person appointment when you book." },
@@ -231,14 +179,6 @@ const FAQS = [
   { q: "What if I don't feel like it's the right fit?", a: "That's okay. You can ask to be matched with a different specialist at any time." },
   { q: "Can children and teens be seen?", a: "Yes. Our ABA Therapy and counseling services support children and teens, with parents or guardians involved." },
 ];
-
-function ChipAvatar() {
-  return (
-    <span className="shrink-0 w-10 h-[38px] rounded-full bg-[#7bb4ab] grid place-items-end justify-items-center overflow-hidden">
-      <i className="block w-[66%] h-[62%] bg-[#214f44] rounded-[50%_50%_0_0]" />
-    </span>
-  );
-}
 
 /* ---------- Sections ---------- */
 function Hero({ data }) {
@@ -382,175 +322,11 @@ function Services({ items }) {
   );
 }
 
-function Team({ items, onSelectProfile }) {
-  const list = items && items.length > 0 ? items : TEAM;
-  const [i, setI] = useState(0);
-  const activeIdx = Math.min(i, list.length - 1);
-  const p = list[activeIdx] || list[0];
-  return (
-    <section className={`${sectionClass} bg-tf-mint overflow-hidden`} id="about">
-      <HeadHeart className="top-[3%] right-[3%] w-[260px] h-[260px] opacity-80" />
-      <Dots className="top-[30%] left-[2.5%] w-14 h-14" />
-      <Dots className="bottom-[8%] left-[3%] w-14 h-14" />
-
-      <div className={containerClass}>
-        <Reveal>
-          <h2 className="m-0 font-serif text-[clamp(32px,3.8vw,42px)] font-normal text-tf-ink">
-            The people <span className="text-tf-teal italic">behind</span> your care
-          </h2>
-          <p className="m-0 mt-3 text-lg max-w-[560px] leading-normal text-tf-body">
-            Licensed, experienced professionals who will listen first and guide you at a pace that feels right.
-          </p>
-        </Reveal>
-
-        <div className="grid grid-cols-[minmax(260px,440px)_1fr] gap-[clamp(40px,6vw,96px)] items-center mt-14 max-[900px]:grid-cols-1">
-          <div className="group relative aspect-square w-full max-w-[380px] justify-self-center" aria-hidden="true">
-            <div className="absolute inset-0 -translate-x-3 -translate-y-4 border border-[#6bbfaa] rounded-full transition-transform duration-[800ms] ease-tf group-hover:translate-x-0 group-hover:translate-y-0" />
-            <div className="relative h-full rounded-full bg-[#aac6b7] overflow-hidden flex flex-col items-center gap-[11.7%]">
-              <i className="block w-[32%] aspect-square mt-[28%] rounded-full bg-[#335b51]" />
-              <i className="block w-[74%] h-[64%] rounded-full bg-[#26a38c]" />
-            </div>
-          </div>
-
-          <div>
-            <div className="flex flex-wrap gap-3.5" role="tablist" aria-label="Team members">
-              {list.map((t, idx) => {
-                const active = idx === activeIdx;
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    className={`flex items-center gap-3 py-3 pr-[26px] pl-4 rounded-[34px] border text-left cursor-pointer font-inherit transition-[background,color,border-color,transform] duration-300 ease-tf hover:-translate-y-0.5 max-[560px]:w-full ${active
-                      ? "bg-tf-teal border-tf-teal text-white"
-                      : "bg-white border-black/15 text-[#202020] hover:border-tf-teal"
-                      }`}
-                    onClick={() => setI(idx)}
-                  >
-                    <ChipAvatar />
-                    <span>
-                      <b className="block font-normal text-[15px]">{t.name}</b>
-                      <small className={`block text-[13px] ${active ? "opacity-80" : "opacity-65"}`}>{t.role}</small>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div
-              className="mt-10 animate-[tf-fade-slide_0.55s_var(--ease-tf)] motion-reduce:animate-none"
-              key={activeIdx}
-            >
-              <p className="m-0 text-[13px] font-bold tracking-[0.1em] text-tf-teal">{(p.role || "THERAPIST").toUpperCase()}</p>
-              <h3 className="m-0 text-tf-teal font-normal text-[clamp(28px,3.4vw,36px)] my-2 font-serif">{p.name}</h3>
-              {p.quote && (
-                <blockquote className="m-0 font-serif font-bold text-tf-ink text-[22px] leading-[1.3] max-w-[480px] border-l-[3px] border-tf-teal pl-4">
-                  {p.quote}
-                </blockquote>
-              )}
-              <p className="m-0 my-6 max-w-[500px] text-base leading-[1.7] text-tf-body">{p.bio}</p>
-              {p.tags && p.tags.length > 0 && (
-                <>
-                  <p className="m-0 text-[13px] font-bold tracking-[0.1em] text-tf-teal">WORKS WITH</p>
-                  <ul className="flex flex-wrap gap-2.5 mt-3 mb-0 mx-0 list-none p-0">
-                    {p.tags.map((t) => (
-                      <li
-                        key={t}
-                        className="font-serif font-bold text-xs text-[rgba(26,35,50,0.7)] bg-[rgba(74,155,142,0.15)] py-1.5 px-4 rounded-xl"
-                      >
-                        {t}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-
-              <div className="mt-7">
-                <button
-                  type="button"
-                  onClick={() => onSelectProfile && onSelectProfile(p)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-tf-navy px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition cursor-pointer"
-                >
-                  View {p.name}'s Profile →
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Stories({ items }) {
-  const list = items && items.length > 0 ? items : STORIES;
-  const [i, setI] = useState(0);
-  const go = (d) => setI((x) => (x + d + list.length) % list.length);
-  const activeIdx = Math.min(i, list.length - 1);
-  const s = list[activeIdx] || list[0];
-  return (
-    <section className={`${sectionClass} bg-tf-mint overflow-hidden`}>
-      <Vine className="bottom-[-4%] left-[1%] w-[110px] h-[330px]" />
-      <Vine flip className="top-[6%] right-[1.5%] w-[100px] h-[300px]" />
-      <Dots className="top-[8%] left-[4%] w-14 h-14" />
-      <Dots className="top-[30%] right-[10%] w-14 h-14" />
-      <PaleCircle className="bottom-[-6%] right-[6%] w-[200px] h-[200px]" />
-
-      <div className={`${containerClass} max-w-[900px] text-center`}>
-        <Reveal>
-          <p className="m-0 text-[13px] font-bold tracking-[0.1em] text-tf-teal">STORIES</p>
-          <h2 className="m-0 text-tf-teal text-[clamp(24px,2.8vw,32px)] font-normal mt-2.5 font-serif">
-            Words from people we've supported
-          </h2>
-        </Reveal>
-        <figure
-          className="m-0 mt-12 animate-[tf-fade-slide_0.6s_var(--ease-tf)] motion-reduce:animate-none flex flex-col items-center"
-          key={activeIdx}
-          aria-live="polite"
-        >
-          <blockquote className="m-0 font-serif font-bold text-tf-ink text-[clamp(24px,3.2vw,36px)] leading-[1.4] max-w-[800px]">
-            “{s.text}”
-          </blockquote>
-          <figcaption className="flex items-center gap-3.5 mt-8">
-            <ChipAvatar />
-            <span>
-              <b className="font-serif text-[17px] block font-bold">{s.who}</b>
-              <small className="font-serif text-[13px] opacity-60">Client</small>
-            </span>
-          </figcaption>
-        </figure>
-        <div className="flex items-center justify-center gap-3.5 mt-10 text-[#7bb4ab] font-serif text-sm font-bold">
-          <button
-            type="button"
-            onClick={() => go(-1)}
-            aria-label="Previous story"
-            className="w-9 h-9 rounded-full border-0 bg-[#99cbc2] text-white text-xl leading-none cursor-pointer transition-[background,transform] duration-[250ms] ease-tf hover:bg-tf-teal hover:scale-[1.08]"
-          >
-            ‹
-          </button>
-          <span>
-            {activeIdx + 1} of {list.length}
-          </span>
-          <button
-            type="button"
-            onClick={() => go(1)}
-            aria-label="Next story"
-            className="w-9 h-9 rounded-full border-0 bg-[#99cbc2] text-white text-xl leading-none cursor-pointer transition-[background,transform] duration-[250ms] ease-tf hover:bg-tf-teal hover:scale-[1.08]"
-          >
-            ›
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function FAQ({ items }) {
   const list = items && items.length > 0 ? items : FAQS;
   const [open, setOpen] = useState(0);
   return (
-    <section className={`${sectionClass} bg-white overflow-hidden`} id="faq">
+    <section className={`${sectionClass} bg-tf-mint overflow-hidden`} id="faq">
       <QuestionBubble className="bottom-[2%] left-[2%] w-[200px] h-[320px]" />
       <HeartBubble className="bottom-[4%] right-[2%] w-[200px] h-[310px]" />
 
@@ -648,7 +424,7 @@ function ContactInquiry() {
   ];
 
   return (
-    <section className={`${sectionClass} bg-tf-mint`} id="inquiry">
+    <section className={`${sectionClass} bg-white`} id="inquiry">
       <div className={containerClass}>
         <Reveal>
           <SectionHead
@@ -775,9 +551,9 @@ function ContactInquiry() {
   );
 }
 
+/* ---------- Page ---------- */
 export default function Home() {
   const content = useHomeContent();
-  const [modalProfile, setModalProfile] = useState(null);
 
   return (
     <div className="font-sans text-black bg-tf-bg overflow-x-hidden antialiased">
@@ -786,19 +562,10 @@ export default function Home() {
         <Hero data={content?.hero} />
         <HowItWorks items={content?.steps} />
         <Services items={content?.services} />
-        <Team items={content?.team} onSelectProfile={setModalProfile} />
-        <Stories items={content?.stories} />
         <FAQ items={content?.faqs} />
         <ContactInquiry contact={content?.contact} />
       </main>
       <Footer />
-
-      {modalProfile && (
-        <TherapistProfileModal
-          profile={modalProfile}
-          onClose={() => setModalProfile(null)}
-        />
-      )}
     </div>
   );
 }

@@ -16,12 +16,20 @@ const panelClass =
 
 const CHECK_TIMEOUT_MS = 8000;
 
-// Kapag lumampas sa oras, itigil ang paghihintay
 const withTimeout = (promise, ms) =>
   Promise.race([
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
   ]);
+
+const peso = (n) => `₱${Number(n).toLocaleString("en-PH")}`;
+const fmtMins = (m) => {
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  if (h === 0) return `${rem} min`;
+  if (rem === 0) return `${h} ${h === 1 ? "hr" : "hrs"}`;
+  return `${h}h ${rem}m`;
+};
 
 /* ---------- Professional loading (skeleton) ---------- */
 const Bar = ({ className = "" }) => (
@@ -34,11 +42,9 @@ function BookingSkeleton() {
       <Navbar />
       <main className={mainPad}>
         <div className={container}>
-          {/* Heading */}
           <Bar className="h-3 w-28" />
           <Bar className="mt-4 h-9 w-[min(420px,80%)]" />
 
-          {/* Step rail */}
           <div className="mt-6 flex items-center gap-3">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="flex flex-1 items-center gap-3">
@@ -49,11 +55,9 @@ function BookingSkeleton() {
           </div>
 
           <div className={gridClass}>
-            {/* Main panel */}
             <div className={panelClass}>
               <Bar className="h-6 w-48" />
               <Bar className="mt-3 h-3 w-72 max-w-full" />
-
               <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {[0, 1, 2].map((i) => (
                   <div key={i} className="rounded-[18px] border border-black/[0.12] p-5">
@@ -66,14 +70,11 @@ function BookingSkeleton() {
                   </div>
                 ))}
               </div>
-
               <div className="mt-8 flex items-center justify-between border-t border-dashed border-[#d0e5dd] pt-5">
                 <Bar className="h-10 w-24 rounded-lg" />
                 <Bar className="h-10 w-28 rounded-lg" />
               </div>
             </div>
-
-            {/* Summary */}
             <div className={panelClass}>
               <Bar className="h-3 w-24" />
               <Bar className="mt-4 h-6 w-3/4" />
@@ -89,12 +90,8 @@ function BookingSkeleton() {
             </div>
           </div>
 
-          {/* Status */}
           <div className="mt-8 flex items-center justify-center gap-3 text-sm text-[#5b6b64]">
-            <span
-              className="size-5 animate-spin rounded-full border-2 border-[#cfe3dc] border-t-tf-teal"
-              aria-hidden="true"
-            />
+            <span className="size-5 animate-spin rounded-full border-2 border-[#cfe3dc] border-t-tf-teal" aria-hidden="true" />
             <span>Checking your booking…</span>
           </div>
         </div>
@@ -104,12 +101,93 @@ function BookingSkeleton() {
   );
 }
 
+/* ---------- Assessment Type Picker ---------- */
+function AssessmentTypePicker({ selectedId, onSelect }) {
+  const [types, setTypes] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch("/assessment-types")
+      .then((d) => { if (alive) setTypes(d.types || []); })
+      .catch((err) => { if (alive) setError(err.message || "Could not load assessment types."); });
+    return () => { alive = false; };
+  }, []);
+
+  if (error) {
+    return (
+      <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {error}
+      </p>
+    );
+  }
+
+  if (types === null) {
+    return (
+      <div className="mt-4 grid gap-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="rounded-[14px] border border-black/[0.12] p-4">
+            <Bar className="h-4 w-48" />
+            <Bar className="mt-2 h-3 w-72 max-w-full" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (types.length === 0) {
+    return (
+      <div className="mt-4 rounded-xl border border-dashed border-[#b6d2c4] bg-[#f9fcfb] px-5 py-6 text-center">
+        <p className="m-0 font-serif text-sm text-[#3d5c52]">No assessment types available yet.</p>
+        <p className="m-0 mt-1 text-xs text-[#666]">The admin hasn't added any assessment types. Please check back later.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 grid gap-3">
+      {types.map((t) => {
+        const selected = selectedId === t.id;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onSelect(t)}
+            className={[
+              "text-left rounded-[14px] border p-4 cursor-pointer transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_18px_-10px_rgba(30,78,65,0.3)] bg-white",
+              selected
+                ? "border-[2.5px] border-tf-teal shadow-[0_6px_14px_-10px_rgba(74,155,142,0.45)]"
+                : "border-black/[0.15]",
+            ].join(" ")}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <h4 className="m-0 font-serif text-[1rem] font-semibold text-[#202020]">{t.name}</h4>
+                {t.description && (
+                  <p className="m-0 mt-1 text-sm leading-relaxed text-[#666]">{t.description}</p>
+                )}
+              </div>
+              <div className="shrink-0 text-right">
+                {t.price > 0 && (
+                  <span className="block font-serif text-[0.95rem] font-bold text-tf-teal">{peso(t.price)}</span>
+                )}
+                <span className="block text-xs text-[#888]">{fmtMins(t.duration_minutes)}</span>
+              </div>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------- Main Page ---------- */
 export default function BookSession() {
   const navigate = useNavigate();
   const { booking, update, service, summaryRows, feeLabel } = useBooking();
   const serviceId = booking.serviceId;
+  const isAssessment = serviceId === "assessment";
 
-  // Tinitingnan muna kung may booking na nasa approval stage
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
@@ -130,13 +208,10 @@ export default function BookSession() {
           navigate("/signin");
           return;
         }
-        // timeout o error: ipakita pa rin ang booking page
         setChecking(false);
       });
 
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -149,6 +224,8 @@ export default function BookSession() {
       serviceId: id,
       psychologistId: null,
       psychologist: null,
+      assessmentTypeId: null,
+      assessmentType: null,
       date: null,
       time: null,
       timeStart: null,
@@ -159,7 +236,14 @@ export default function BookSession() {
     });
   };
 
-  const canContinue = !!serviceId;
+  const handleAssessmentTypeSelect = (t) => {
+    update({ assessmentTypeId: t.id, assessmentType: t });
+  };
+
+  // For assessment, also require an assessment type to be chosen
+  const canContinue = isAssessment
+    ? !!serviceId && !!booking.assessmentTypeId
+    : !!serviceId;
 
   if (checking) return <BookingSkeleton />;
 
@@ -180,6 +264,7 @@ export default function BookSession() {
 
           <div className={gridClass}>
             <Reveal className={panelClass} delay={140}>
+              {/* ---- Service Selection ---- */}
               <header>
                 <h2 className="m-0 mb-1.5 font-serif text-[1.4rem] font-normal text-[#202020]">
                   Choose a service
@@ -224,6 +309,23 @@ export default function BookSession() {
                 })}
               </div>
 
+              {/* ---- Assessment Type Picker (shown only when assessment is selected) ---- */}
+              {isAssessment && (
+                <div className="mt-7 border-t border-dashed border-[#d0e5dd] pt-6">
+                  <h3 className="m-0 mb-1 font-serif text-[1.1rem] font-normal text-[#202020]">
+                    Select assessment type
+                  </h3>
+                  <p className="m-0 text-sm text-[#666]">
+                    Choose the specific type of assessment you need.
+                  </p>
+                  <AssessmentTypePicker
+                    selectedId={booking.assessmentTypeId}
+                    onSelect={handleAssessmentTypeSelect}
+                  />
+                </div>
+              )}
+
+              {/* ---- Contextual hints ---- */}
               {!serviceId && (
                 <div className="mt-6 rounded-xl border border-dashed border-[#b6d2c4] bg-[#f9fcfb] px-5 py-8 text-center">
                   <p className="m-0 font-serif text-base text-[#3d5c52]">No service selected yet</p>
@@ -239,9 +341,15 @@ export default function BookSession() {
                   and see who is available.
                 </p>
               )}
-              {serviceId && serviceId !== "psychotherapy" && (
+              {serviceId && serviceId !== "psychotherapy" && !isAssessment && (
                 <p className="mt-6 mb-0 rounded-xl border border-tf-teal/30 bg-[#f9fcfb] px-5 py-4 text-sm text-tf-body">
                   We will automatically assign the best available specialist for {service?.name}.
+                </p>
+              )}
+              {isAssessment && booking.assessmentTypeId && (
+                <p className="mt-4 mb-0 rounded-xl border border-tf-teal/30 bg-[#f9fcfb] px-5 py-4 text-sm text-tf-body">
+                  A specialist will be automatically assigned for your{" "}
+                  <strong>{booking.assessmentType?.name}</strong> assessment.
                 </p>
               )}
 

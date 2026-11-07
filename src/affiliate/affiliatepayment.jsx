@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import AffiliateNavigation from "./affiliatenav";
+import ProfileMenu from "../components/ProfileMenu";
 import { apiFetch } from "../auth";
 import { peso, to12 } from "../components/payUtils";
 
@@ -206,6 +207,7 @@ export default function AffiliatePayment() {
                 <span className="absolute right-[10px] top-[8px] h-[7px] w-[7px] rounded-full bg-[#e07b6a]" />
               )}
             </button>
+            <ProfileMenu size={37} />
           </div>
         </header>
 

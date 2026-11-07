@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminNavigation from "./adminnavigation";
+import ProfileMenu from "../components/ProfileMenu";
 import { apiFetch } from "../auth";
 import { peso, to12 } from "../components/payUtils";
 
@@ -169,6 +170,7 @@ export default function PaymentDashboard() {
                 <span className="absolute right-[10px] top-[8px] h-[7px] w-[7px] rounded-full bg-[#e07b6a]" />
               )}
             </button>
+            <ProfileMenu size={37} />
           </div>
         </header>
 

@@ -14,7 +14,7 @@ import { getToken, getUser } from "../auth";
 
 export const CLIENT_NAV = [
   { label: "Home", to: "/#top" },
-  { label: "About", to: "/#about" },
+  { label: "About", to: "/about" },
   { label: "Services", to: "/services" },
   { label: "Book Session", to: "/book", auth: true },
   // Guest: "Message the clinic" section sa Home. Naka-sign in: Contact page.

@@ -93,7 +93,7 @@ export default function Profile() {
   const fileRef = useRef(null);
 
   const [user, setUser] = useState(null);
-  const [form, setForm] = useState({ first_name: "", last_name: "", phone: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", phone: "", background: "" });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
 
@@ -117,6 +117,7 @@ export default function Profile() {
       first_name: u.first_name || "",
       last_name: u.last_name || "",
       phone: u.phone || "",
+      background: u.background || "",
     });
 
   const publish = (u) => {
@@ -143,6 +144,7 @@ export default function Profile() {
     );
   }
 
+  const isStaff = user.role === "ADMIN" || user.role === "AFFILIATE";
   const isSystem = user.login_provider === "SYSTEM";
 
   const saveProfile = async (e) => {
@@ -161,6 +163,7 @@ export default function Profile() {
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
         phone: form.phone.trim() || null,
+        ...(isStaff ? { background: form.background.trim() || null } : {}),
       };
       const d = await apiFetch("/profile", { method: "POST", body: JSON.stringify(body) });
       publish(d.user);
@@ -321,6 +324,7 @@ export default function Profile() {
         My <em className="italic text-tf-teal">profile</em>
       </h1>
 
+      {/* Profile Photo Card */}
       <Card title="Profile photo" subtitle="Your photo appears in the top right corner of the site.">
         <div className="flex flex-wrap items-center gap-6">
           <div className="relative">
@@ -330,7 +334,7 @@ export default function Profile() {
               onClick={() => fileRef.current?.click()}
               disabled={photoBusy}
               aria-label="Change photo"
-              className="absolute bottom-0 right-0 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-tf-teal text-white"
+              className="absolute bottom-0 right-0 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-tf-teal text-white shadow hover:opacity-90"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -352,6 +356,14 @@ export default function Profile() {
                 {PROVIDER_LABEL[user.login_provider] || user.login_provider}
               </span>
             </div>
+
+            {/* Display professional background snippet in profile card if available */}
+            {isStaff && user.background && (
+              <p className="mt-3 font-serif text-sm italic text-[#555] leading-relaxed max-w-xl">
+                “{user.background}”
+              </p>
+            )}
+
             <div className="mt-4 flex flex-wrap gap-3">
               <button type="button" className={btnPrimary} onClick={() => fileRef.current?.click()} disabled={photoBusy}>
                 {photoBusy ? "Please wait…" : "Change photo"}
@@ -371,7 +383,11 @@ export default function Profile() {
         )}
       </Card>
 
-      <Card title="Personal information" subtitle="Update your details below.">
+      {/* Personal Information & Background Card */}
+      <Card
+        title="Personal information"
+        subtitle={isStaff ? "Update your personal details and professional background below." : "Update your details below."}
+      >
         <form className="flex flex-col gap-4" onSubmit={saveProfile} noValidate>
           <div className="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
             <label className={labelClass}>
@@ -426,7 +442,7 @@ export default function Profile() {
                 )}
 
                 {emailOpen && emailStep === "request" && (
-                  <form onSubmit={requestEmailCode} className="mt-3 flex flex-col gap-3 rounded-lg border border-black/10 bg-[#fafafa] p-4">
+                  <div className="mt-3 flex flex-col gap-3 rounded-lg border border-black/10 bg-[#fafafa] p-4">
                     <label className={labelClass}>
                       NEW EMAIL
                       <input
@@ -441,18 +457,18 @@ export default function Profile() {
                     </label>
                     <Notice msg={emailMsg} />
                     <div className="flex gap-3">
-                      <button type="submit" className={btnPrimary} disabled={emailBusy}>
+                      <button type="button" onClick={requestEmailCode} className={btnPrimary} disabled={emailBusy}>
                         {emailBusy ? "Sending…" : "Send code"}
                       </button>
                       <button type="button" className={btnGhost} onClick={resetEmailFlow} disabled={emailBusy}>
                         Cancel
                       </button>
                     </div>
-                  </form>
+                  </div>
                 )}
 
                 {emailOpen && emailStep === "confirm" && (
-                  <form onSubmit={confirmEmailCode} className="mt-3 flex flex-col gap-3 rounded-lg border border-black/10 bg-[#fafafa] p-4">
+                  <div className="mt-3 flex flex-col gap-3 rounded-lg border border-black/10 bg-[#fafafa] p-4">
                     <div className="text-sm text-[#555]">
                       Code sent to <strong>{newEmail}</strong>. Enter it below.
                     </div>
@@ -472,7 +488,7 @@ export default function Profile() {
                     </label>
                     <Notice msg={emailMsg} />
                     <div className="flex flex-wrap gap-3">
-                      <button type="submit" className={btnPrimary} disabled={emailBusy}>
+                      <button type="button" onClick={confirmEmailCode} className={btnPrimary} disabled={emailBusy}>
                         {emailBusy ? "Confirming…" : "Confirm new email"}
                       </button>
                       <button
@@ -491,7 +507,7 @@ export default function Profile() {
                         Cancel
                       </button>
                     </div>
-                  </form>
+                  </div>
                 )}
               </>
             ) : (
@@ -515,6 +531,23 @@ export default function Profile() {
             />
           </label>
 
+          {/* Background field for Admin & Affiliate only */}
+          {isStaff && (
+            <label className={labelClass}>
+              BACKGROUND / ABOUT YOU
+              <textarea
+                rows={5}
+                className={`${inputClass} leading-relaxed resize-y`}
+                value={form.background}
+                onChange={(e) => setForm({ ...form, background: e.target.value })}
+                placeholder="e.g. I am a registered psychologist specializing in psychotherapy, cognitive behavioral therapy, and child assessments with over 5 years of clinical experience..."
+              />
+              <span className="mt-1 block text-xs font-normal text-[#888]">
+                Describe your professional background, credentials, and expertise.
+              </span>
+            </label>
+          )}
+
           <Notice msg={msg} />
           <div>
             <button type="submit" className={btnPrimary} disabled={saving}>
@@ -532,6 +565,14 @@ export default function Profile() {
               <dd className="m-0 mt-1 break-words text-sm text-[#202020]">{v}</dd>
             </div>
           ))}
+          {isStaff && user.background && (
+            <div className="col-span-2 max-[560px]:col-span-1 border-t border-black/5 pt-3 mt-1">
+              <dt className="text-xs font-bold tracking-[0.08em] text-[#888]">PROFESSIONAL BACKGROUND</dt>
+              <dd className="m-0 mt-1 whitespace-pre-line text-sm text-[#202020] leading-relaxed">
+                {user.background}
+              </dd>
+            </div>
+          )}
         </dl>
       </Card>
 

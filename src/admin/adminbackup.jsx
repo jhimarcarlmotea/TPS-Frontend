@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import AdminNavigation from "./adminnavigation";
+import ProfileMenu from "../components/ProfileMenu";
 
 const FONT_CSS = `@import url('https://fonts.googleapis.com/css2?family=Inknut+Antiqua:wght@600&family=Inria+Serif:wght@400;700&family=Inter:wght@400;600;700&display=swap');`;
 
@@ -138,6 +139,7 @@ export default function BackupRestoreDashboard() {
               <Bell className="h-[18px] w-[18px] text-[#2a8570]" />
               <span className="absolute right-[10px] top-[8px] h-[7px] w-[7px] rounded-full bg-[#e07b6a]" />
             </button>
+            <ProfileMenu size={37} />
           </div>
         </header>
 

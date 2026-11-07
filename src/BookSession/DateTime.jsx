@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Navbar, Footer, Reveal, container, btnGhost, btnSolid } from "../components/Layout";
 import { Avatar } from "../components/ProfileMenu";
@@ -173,6 +173,7 @@ export default function DateTime() {
   const calendarParams = () => {
     const q = new URLSearchParams({ service: serviceId });
     if (isPsycho && pFirst) q.set("psychologist_id", psychId);
+    if (serviceId === "assessment" && booking.assessmentTypeId) q.set("assessment_type_id", booking.assessmentTypeId);
     // ABA / Assessment reschedule: same provider pa rin
     if (isResched && !isPsycho && reschedule.providerId) {
       q.set("provider_id", reschedule.providerId);
@@ -347,6 +348,7 @@ export default function DateTime() {
       body: JSON.stringify({
         service: serviceId,
         psychologist_id: isPsycho ? psychId : null,
+        ...(serviceId === "assessment" && booking.assessmentTypeId ? { assessment_type_id: booking.assessmentTypeId } : {}),
         // ABA / Assessment reschedule: same provider
         ...(isResched && !isPsycho && reschedule.providerId
           ? { provider_id: reschedule.providerId }

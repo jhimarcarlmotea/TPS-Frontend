@@ -5,6 +5,7 @@ import { apiFetch, getUser } from "../auth";
 import echo from "../echo";
 import { Search, Send, MessageSquare, Phone, Video } from "lucide-react"; // Idinagdag ang Phone at Video icons
 import { Photo } from "../components/Layout";
+import ProfileMenu from "../components/ProfileMenu";
 import VideoCall from "../components/VideoCall";
 
 const avatarWrap = "size-11 shrink-0 overflow-hidden rounded-full bg-[#aac6b7]";
@@ -101,9 +102,12 @@ export default function AdminMessages() {
       </div>
 
       <main className="min-w-0 flex-1 p-4 sm:p-8 h-screen flex flex-col">
-        <header className="mb-6 shrink-0">
-          <h1 className="m-0 font-serif text-[32px] font-bold text-[#2f4a42]">Messages</h1>
-          <p className="m-0 mt-1 text-[#666]">Communicate with your clients and team.</p>
+        <header className="mb-6 flex shrink-0 items-start justify-between gap-4">
+          <div>
+            <h1 className="m-0 font-serif text-[32px] font-bold text-[#2f4a42]">Messages</h1>
+            <p className="m-0 mt-1 text-[#666]">Communicate with your clients and team.</p>
+          </div>
+          <ProfileMenu size={37} />
         </header>
 
         <div className="flex-1 flex bg-white rounded-2xl border border-black/10 overflow-hidden shadow-sm min-h-0">

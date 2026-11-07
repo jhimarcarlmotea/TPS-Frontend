@@ -3,60 +3,86 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Logo, Photo } from "../components/Layout";
 import { logout } from "../auth";
 
+const inter = "font-['Inter',Helvetica,sans-serif]";
+const serif = "font-['Inria_Serif',Georgia,serif]";
 
-const ITEMS = [
-    { key: "dashboard", label: "Dashboard", href: "/affiliate", icon: "grid" },
-    { key: "appointment", label: "Appointment", href: "/affiliate/appointment", icon: "calendar" },
-    { key: "schedules", label: "Schedules", href: "/affiliate/schedules", icon: "clock" },
-    { key: "payment", label: "Payment", href: "/affiliate/payment", icon: "wallet" },
+/* ---------- Menu, grouped under labels ----------
+   exact: true -> active only on that exact path
+   otherwise   -> active on that path and its sub-pages */
+const NAV_GROUPS = [
+    {
+        label: "Overview",
+        items: [{ key: "dashboard", label: "Dashboard", href: "/affiliate", icon: "dashboard", exact: true }],
+    },
+    {
+        label: "Clinic",
+        items: [
+            { key: "appointment", label: "Appointment", href: "/affiliate/appointment", icon: "appointment" },
+            { key: "schedules", label: "Schedules", href: "/affiliate/schedules", icon: "schedules" },
+        ],
+    },
+    {
+        label: "Billing",
+        items: [{ key: "payment", label: "Payment", href: "/affiliate/payment", icon: "payment" }],
+    },
 ];
 
-const Icon = ({ name }) => {
-    const common = {
-        width: 17,
-        height: 17,
-        viewBox: "0 0 24 24",
-        fill: "none",
-        stroke: "#1f6b55",
-        strokeWidth: 2,
-        strokeLinecap: "round",
-        strokeLinejoin: "round",
-        "aria-hidden": true,
-    };
-    switch (name) {
-        case "calendar":
-            return (
-                <svg {...common}>
-                    <rect x="3" y="4" width="18" height="18" rx="2" />
-                    <path d="M16 2v4M8 2v4M3 10h18" />
-                </svg>
-            );
-        case "clock":
-            return (
-                <svg {...common}>
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 7v5l3 2" />
-                </svg>
-            );
-        case "wallet":
-            return (
-                <svg {...common}>
-                    <path d="M3 7a2 2 0 0 1 2-2h13v4" />
-                    <path d="M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z" />
-                    <circle cx="16.5" cy="14.5" r="1" fill="#1f6b55" />
-                </svg>
-            );
-        default:
-            return (
-                <svg {...common} fill="#1f6b55" stroke="none">
-                    <rect x="3" y="3" width="8" height="8" rx="1.5" />
-                    <rect x="13" y="3" width="8" height="8" rx="1.5" />
-                    <rect x="3" y="13" width="8" height="8" rx="1.5" />
-                    <rect x="13" y="13" width="8" height="8" rx="1.5" />
-                </svg>
-            );
-    }
+/* ---------- Icons (24x24 stroke set) ---------- */
+const ICONS = {
+    dashboard: (
+        <>
+            <rect x="3" y="3" width="7" height="9" rx="1.5" />
+            <rect x="14" y="3" width="7" height="5" rx="1.5" />
+            <rect x="14" y="12" width="7" height="9" rx="1.5" />
+            <rect x="3" y="16" width="7" height="5" rx="1.5" />
+        </>
+    ),
+    appointment: (
+        <>
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4" />
+        </>
+    ),
+    schedules: (
+        <>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
+        </>
+    ),
+    payment: (
+        <>
+            <path d="M3 7a2 2 0 0 1 2-2h13v4" />
+            <path d="M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z" />
+            <circle cx="16.5" cy="14.5" r="1" fill="currentColor" />
+        </>
+    ),
+    logout: (
+        <>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <path d="M16 17l5-5-5-5M21 12H9" />
+        </>
+    ),
 };
+
+const Icon = ({ name, size = 19 }) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className="shrink-0"
+    >
+        {ICONS[name]}
+    </svg>
+);
+
+const isActiveRoute = (pathname, item) =>
+    item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href);
 
 /**
  * Responsive na sidebar.
@@ -136,7 +162,7 @@ export default function AffiliateNavigation({ open = false, onClose = () => { } 
 
             <aside
                 aria-label="Main navigation"
-                className={`fixed inset-y-0 left-0 z-50 flex w-[321px] max-w-[85vw] shrink-0 flex-col overflow-y-auto rounded-r-[50px] bg-[#1f4d3f] transition-transform duration-200 motion-reduce:transition-none lg:max-w-none lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"
+                className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[288px] max-w-[85vw] shrink-0 flex-col rounded-r-[32px] bg-[#1f4d3f] transition-transform duration-200 motion-reduce:transition-none lg:max-w-none lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"
                     }`}
             >
                 {/* Close button (mobile/tablet lang) */}
@@ -144,15 +170,15 @@ export default function AffiliateNavigation({ open = false, onClose = () => { } 
                     type="button"
                     onClick={close}
                     aria-label="Close menu"
-                    className="absolute right-[18px] top-[18px] flex h-[34px] w-[34px] items-center justify-center rounded-full text-[#a8c8b8] hover:bg-white/10 hover:text-white lg:hidden"
+                    className="absolute right-[18px] top-[22px] flex h-[34px] w-[34px] items-center justify-center rounded-full text-[#a8c8b8] hover:bg-white/10 hover:text-white lg:hidden"
                 >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                         <path d="M6 6l12 12M18 6 6 18" />
                     </svg>
                 </button>
 
-                {/* Brand header */}
-                <div className="relative mt-[38px] shrink-0 px-[26px]">
+                {/* Brand */}
+                <div className="shrink-0 px-[26px] pb-[20px] pt-[30px]">
                     <Link to="/" onClick={close} className="group flex items-center gap-[12px] no-underline" aria-label="Threefold Home">
                         <Photo
                             src="/img/Threefold%20logo.png"
@@ -161,56 +187,78 @@ export default function AffiliateNavigation({ open = false, onClose = () => { } 
                             fallback={<Logo size={42} />}
                         />
                         <div className="flex flex-col">
-                            <span className="font-['Inria_Serif',Georgia,serif] text-[15px] font-bold leading-[16px] tracking-[0.05em] text-[#f2f7f4] transition-colors group-hover:text-white">
+                            <span className={`${serif} text-[15px] font-bold leading-[16px] tracking-[0.05em] text-[#f2f7f4] transition-colors group-hover:text-white`}>
                                 THREEFOLD
                             </span>
-                            <span className="mt-[3px] max-w-[195px] font-['Inria_Serif',Georgia,serif] text-[8px] leading-[11px] text-[#a8c8b8]">
+                            <span className={`${serif} mt-[3px] max-w-[170px] text-[8px] leading-[11px] text-[#a8c8b8]`}>
                                 Behavioral Interventions And Psychological Services
                             </span>
                         </div>
                     </Link>
+                    <span className={`${inter} mt-[14px] inline-block rounded-full bg-white/10 px-[10px] py-[3px] text-[10px] font-bold uppercase tracking-[0.12em] text-[#cfe3d8]`}>
+                        Affiliate panel
+                    </span>
                 </div>
 
-                <span className="mt-[84px] block shrink-0 pl-[40px] text-[14px] font-bold uppercase tracking-[2.52px] text-[#a8c8b8]">
-                    MENU
-                </span>
+                <div className="mx-[26px] h-px shrink-0 bg-white/10" />
 
-                {/* Menu: bawat item may sariling slot, ang active ang nagiging white pill */}
-                <nav className="ml-[26px] mt-[7px] flex shrink-0 flex-col gap-[16px]">
-                    {ITEMS.map((item) => {
-                        const isActive = pathname === item.href;
+                {/* Scrollable menu area */}
+                <nav aria-label="Affiliate navigation" className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-[18px] pr-[6px] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.22)_transparent] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/35">
+                    {NAV_GROUPS.map((group, gi) => {
+                        const labelId = `affiliate-nav-${gi}`;
                         return (
-                            <Link
-                                key={item.key}
-                                to={item.href}
-                                onClick={close}
-                                aria-current={isActive ? "page" : undefined}
-                                className={`flex h-[56px] items-center rounded-l-[28px] ${isActive
-                                        ? "gap-3 bg-white pl-[22px] text-[18px] font-bold text-[#1f6b55]"
-                                        : "pl-[14px] text-[20px] font-semibold text-[#4a9b8e] hover:text-white"
-                                    }`}
-                            >
-                                {isActive && <Icon name={item.icon} />}
-                                {item.label}
-                            </Link>
+                            <div key={group.label} role="group" aria-labelledby={labelId} className={gi > 0 ? "mt-[20px]" : ""}>
+                                <h2
+                                    id={labelId}
+                                    className={`${inter} m-0 px-[30px] pb-[6px] text-[11px] font-bold uppercase tracking-[0.14em] text-[#7fb09b]`}
+                                >
+                                    {group.label}
+                                </h2>
+                                <ul className="m-0 flex list-none flex-col gap-[3px] p-0">
+                                    {group.items.map((item) => {
+                                        const active = isActiveRoute(pathname, item);
+                                        return (
+                                            <li key={item.key} className="px-[16px]">
+                                                <Link
+                                                    to={item.href}
+                                                    onClick={close}
+                                                    aria-current={active ? "page" : undefined}
+                                                    className={`${inter} flex h-[42px] items-center gap-[12px] rounded-[10px] px-[14px] text-[14px] no-underline transition-colors ${active
+                                                        ? "bg-white font-bold text-[#1f4d3f] shadow-sm"
+                                                        : "font-medium text-[#cfe3d8] hover:bg-white/10 hover:text-white"
+                                                        }`}
+                                                >
+                                                    <span className={active ? "text-[#10a28c]" : "text-[#7fb09b]"}>
+                                                        <Icon name={item.icon} />
+                                                    </span>
+                                                    {item.label}
+                                                </Link>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
                         );
                     })}
                 </nav>
 
-                {/* Logout: laging nasa ilalim, pero hindi na tatakpan ang menu sa maiikling screen */}
-                <div className="mt-auto shrink-0 pb-[60px] pl-[40px] pt-[32px]">
+                {/* Logout: laging nasa ilalim, hindi tatakpan ang menu sa maiikling screen */}
+                <div className="shrink-0 border-t border-white/10 px-[16px] py-[16px]">
                     <button
                         type="button"
                         onClick={handleLogout}
-                        className="cursor-pointer border-0 bg-transparent p-0 text-[20px] font-semibold text-[#4a9b8e] hover:text-white"
+                        className={`${inter} flex h-[42px] w-full cursor-pointer items-center gap-[12px] rounded-[10px] border-0 bg-transparent px-[14px] text-left text-[14px] font-medium text-[#cfe3d8] transition-colors hover:bg-white/10 hover:text-white`}
                     >
+                        <span className="text-[#7fb09b]">
+                            <Icon name="logout" />
+                        </span>
                         Logout
                     </button>
                 </div>
             </aside>
 
             {/* Spacer: nagre-reserve ng espasyo sa desktop lang */}
-            <div className="hidden w-[321px] shrink-0 lg:block" aria-hidden="true" />
+            <div className="hidden w-[288px] shrink-0 lg:block" aria-hidden="true" />
         </>
     );
 }

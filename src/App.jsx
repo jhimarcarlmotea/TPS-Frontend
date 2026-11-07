@@ -30,7 +30,7 @@ import AffiliatePayment from "./affiliate/affiliatepayment";
 import Profile from "./pages/Profile";
 import HoldExpiryModal from "./BookSession/HoldExpiryModal";
 import AdminMessages from "./admin/adminmessages";
-
+import About from "./About/About";
 const ClientArea = ({ children }) => (
   <RequireAuth roles={["CLIENT", "ADMIN"]}>{children}</RequireAuth>
 );
@@ -45,7 +45,7 @@ const AffiliateOnly = ({ children }) => (
 function BookingLayout() {
   return (
     <ClientArea>
-       <BookingProvider>
+      <BookingProvider>
         <Outlet />
         <HoldExpiryModal />
       </BookingProvider>
@@ -59,7 +59,7 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/services" element={<Services />} />
       <Route path="/signin" element={<SignIn />} />
-
+      <Route path="/about" element={<About />} />
       {/* Booking flow (CLIENT, or ADMIN for preview) — naka-wrap sa BookingProvider */}
       <Route element={<BookingLayout />}>
         <Route path="/book" element={<BookSession />} />

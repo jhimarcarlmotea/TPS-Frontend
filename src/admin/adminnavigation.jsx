@@ -5,48 +5,151 @@ import { logout } from "../auth";
 
 const inter = "font-['Inter',Helvetica,sans-serif]";
 const serif = "font-['Inria_Serif',Georgia,serif]";
-const inknut = "font-['Inknut_Antiqua',Georgia,serif]";
 
-const NAV_ITEMS = [
-    { label: "Dashboard", to: "/admin" },
-    { label: "Appointment", to: "/admin/appointment" },
-    { label: "Messages", to: "/admin/messages" },
-    { label: "Schedules", to: "/admin/schedule" },
-    { label: "Services", to: "/admin/services" },
-    { label: "Payment", to: "/admin/payment" },
-    { label: "Backup and Restore", to: "/admin/backup" },
-    { label: "Accounts", to: "/admin/accounts" },
-    { label: "Client", to: "/admin/client" },
-    { label: "Home", to: "/admin/home" },
+/* ---------- Menu, grouped under labels ----------
+   exact: true  -> active only on that exact path
+   otherwise    -> active on that path and any sub-page (e.g. /admin/payment-methods) */
+const NAV_GROUPS = [
+    {
+        label: "Overview",
+        items: [{ label: "Dashboard", to: "/admin", icon: "dashboard", exact: true }],
+    },
+    {
+        label: "Clinic",
+        items: [
+            { label: "Appointment", to: "/admin/appointment", icon: "appointment" },
+            { label: "Messages", to: "/admin/messages", icon: "messages" },
+            { label: "Schedules", to: "/admin/schedule", icon: "schedules" },
+        ],
+    },
+    {
+        label: "Business",
+        items: [
+            { label: "Services", to: "/admin/services", icon: "services" },
+            { label: "Payment", to: "/admin/payment", icon: "payment" },
+        ],
+    },
+    {
+        label: "People",
+        items: [
+            { label: "Client", to: "/admin/client", icon: "client" },
+            { label: "Accounts", to: "/admin/accounts", icon: "accounts" },
+        ],
+    },
+    {
+        label: "Website & System",
+        items: [
+            { label: "Home", to: "/admin/home", icon: "home" },
+            { label: "Backup and Restore", to: "/admin/backup", icon: "backup" },
+        ],
+    },
 ];
 
 // Para ma-preview ng admin ang ibang site nang hindi nagla-logout
 const PREVIEW_ITEMS = [
-    { label: "Client site", to: "/appointments" },
-    { label: "Affiliate site", to: "/affiliate" },
+    { label: "Client site", to: "/appointments", icon: "client" },
+    { label: "Affiliate site", to: "/affiliate", icon: "accounts" },
 ];
 
-const GridIcon = ({ className = "" }) => (
-    <svg className={className} width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <rect x="2" y="2" width="6" height="6" rx="1.2" />
-        <rect x="12" y="2" width="6" height="6" rx="1.2" />
-        <rect x="2" y="12" width="6" height="6" rx="1.2" />
-        <rect x="12" y="12" width="6" height="6" rx="1.2" />
-    </svg>
-);
-
-const ExternalIcon = () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M7 17L17 7M9 7h8v8" />
-    </svg>
-);
-
-const isActiveRoute = (pathname, to) => {
-    if (to === "/admin/payment") {
-        return pathname === to || pathname === "/admin/payment-method";
-    }
-    return pathname === to;
+/* ---------- Icons (24x24 stroke set) ---------- */
+const ICONS = {
+    dashboard: (
+        <>
+            <rect x="3" y="3" width="7" height="9" rx="1.5" />
+            <rect x="14" y="3" width="7" height="5" rx="1.5" />
+            <rect x="14" y="12" width="7" height="9" rx="1.5" />
+            <rect x="3" y="16" width="7" height="5" rx="1.5" />
+        </>
+    ),
+    appointment: (
+        <>
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4" />
+        </>
+    ),
+    messages: <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />,
+    schedules: (
+        <>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
+        </>
+    ),
+    services: (
+        <>
+            <rect x="3" y="7" width="18" height="13" rx="2" />
+            <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18" />
+        </>
+    ),
+    payment: (
+        <>
+            <path d="M3 7a2 2 0 0 1 2-2h13v4" />
+            <path d="M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z" />
+            <circle cx="16.5" cy="14.5" r="1" fill="currentColor" />
+        </>
+    ),
+    client: (
+        <>
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 21a8 8 0 0 1 16 0" />
+        </>
+    ),
+    accounts: (
+        <>
+            <circle cx="9" cy="8" r="3.5" />
+            <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+            <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2A6.5 6.5 0 0 1 21.5 20" />
+        </>
+    ),
+    home: (
+        <>
+            <path d="M3 11l9-8 9 8" />
+            <path d="M5 10v10h14V10" />
+            <path d="M10 20v-6h4v6" />
+        </>
+    ),
+    backup: (
+        <>
+            <ellipse cx="12" cy="5" rx="8" ry="3" />
+            <path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+        </>
+    ),
+    logout: (
+        <>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <path d="M16 17l5-5-5-5M21 12H9" />
+        </>
+    ),
+    external: <path d="M7 17L17 7M9 7h8v8" />,
 };
+
+const Icon = ({ name, size = 19 }) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className="shrink-0"
+    >
+        {ICONS[name]}
+    </svg>
+);
+
+const isActiveRoute = (pathname, item) =>
+    item.exact ? pathname === item.to : pathname === item.to || pathname.startsWith(item.to);
+
+const GroupLabel = ({ id, children }) => (
+    <h2
+        id={id}
+        className={`${inter} m-0 px-[30px] pb-[6px] text-[11px] font-bold uppercase tracking-[0.14em] text-[#7fb09b]`}
+    >
+        {children}
+    </h2>
+);
 
 export default function AdminNavigation() {
     const { pathname } = useLocation();
@@ -102,7 +205,7 @@ export default function AdminNavigation() {
             )}
 
             <aside
-                className={`fixed left-0 top-0 z-50 flex h-screen w-[min(321px,85vw)] shrink-0 flex-col overflow-y-auto rounded-tr-[64px] rounded-br-[64px] rounded-bl-[32px] bg-[#1f4d3f] transition-[transform,visibility] duration-300 lg:w-[321px] lg:translate-x-0 ${open ? "translate-x-0" : "max-lg:invisible max-lg:-translate-x-full"
+                className={`fixed left-0 top-0 z-50 flex h-[100dvh] w-[min(288px,85vw)] shrink-0 flex-col rounded-r-[32px] bg-[#1f4d3f] transition-[transform,visibility] duration-300 lg:w-[288px] lg:translate-x-0 ${open ? "translate-x-0" : "max-lg:invisible max-lg:-translate-x-full"
                     }`}
             >
                 {/* Close button: mobile lang */}
@@ -110,14 +213,15 @@ export default function AdminNavigation() {
                     type="button"
                     onClick={close}
                     aria-label="Close menu"
-                    className="absolute right-[44px] top-[34px] grid h-[36px] w-[36px] place-items-center rounded-full text-[#a8c8b8] hover:text-white lg:hidden"
+                    className="absolute right-[18px] top-[22px] grid h-[36px] w-[36px] place-items-center rounded-full text-[#a8c8b8] hover:bg-white/10 hover:text-white lg:hidden"
                 >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
                         <path d="M6 6l12 12M18 6L6 18" />
                     </svg>
                 </button>
 
-                <div className="relative mt-[38px] px-[26px]">
+                {/* Brand */}
+                <div className="shrink-0 px-[26px] pb-[20px] pt-[30px]">
                     <Link to="/" onClick={close} className="group flex items-center gap-[12px] no-underline" aria-label="Threefold Home">
                         <Photo
                             src="/img/Threefold%20logo.png"
@@ -125,79 +229,97 @@ export default function AdminNavigation() {
                             fallback={<Logo size={42} />}
                         />
                         <div className="flex flex-col">
-                            <span className={`${serif} text-[15px] font-bold tracking-[0.05em] leading-[16px] text-[#f2f7f4] transition-colors group-hover:text-white`}>
+                            <span className={`${serif} text-[15px] font-bold leading-[16px] tracking-[0.05em] text-[#f2f7f4] transition-colors group-hover:text-white`}>
                                 THREEFOLD
                             </span>
-                            <span className={`${serif} mt-[3px] max-w-[195px] text-[8px] leading-[11px] text-[#a8c8b8]`}>
+                            <span className={`${serif} mt-[3px] max-w-[170px] text-[8px] leading-[11px] text-[#a8c8b8]`}>
                                 Behavioral Interventions And Psychological Services
                             </span>
                         </div>
                     </Link>
+                    <span className={`${inter} mt-[14px] inline-block rounded-full bg-white/10 px-[10px] py-[3px] text-[10px] font-bold uppercase tracking-[0.12em] text-[#cfe3d8]`}>
+                        Admin panel
+                    </span>
                 </div>
 
-                <div className={`${inter} mt-[44px] px-[40px] text-[14px] font-bold tracking-[2.52px] text-[#a8c8b8]`}>
-                    MENU
-                </div>
+                <div className="mx-[26px] h-px shrink-0 bg-white/10" />
 
-                <nav aria-label="Admin navigation" className="mt-[16px] flex flex-col gap-[14px]">
-                    {NAV_ITEMS.map(({ label, to }) => {
-                        const active = isActiveRoute(pathname, to);
-                        const dashboard = label === "Dashboard";
-
+                {/* Scrollable menu area */}
+                <nav aria-label="Admin navigation" className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-[18px] pr-[6px] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.22)_transparent] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/35">
+                    {NAV_GROUPS.map((group, gi) => {
+                        const labelId = `admin-nav-${gi}`;
                         return (
-                            <Link
-                                key={label}
-                                to={to}
-                                onClick={close}
-                                aria-current={active ? "page" : undefined}
-                                className={active
-                                    ? "ml-[26px] flex h-[52px] items-center gap-[14px] rounded-l-[26px] bg-white pl-[23px] no-underline"
-                                    : `${inknut} flex h-[52px] items-center gap-[14px] px-[40px] text-[20px] font-semibold text-[#2a8570] no-underline transition-colors hover:text-[#4fbfa5]`
-                                }
-                            >
-                                {dashboard && (
-                                    <GridIcon className={active ? "text-[#1f6b55]" : "text-[#2a8570]"} />
-                                )}
-                                <span className={active
-                                    ? `${inter} text-[18px] font-bold text-[#1f6b55]`
-                                    : ""
-                                }>
-                                    {label}
-                                </span>
-                            </Link>
+                            <div key={group.label} role="group" aria-labelledby={labelId} className={gi > 0 ? "mt-[20px]" : ""}>
+                                <GroupLabel id={labelId}>{group.label}</GroupLabel>
+                                <ul className="m-0 flex list-none flex-col gap-[3px] p-0">
+                                    {group.items.map((item) => {
+                                        const active = isActiveRoute(pathname, item);
+                                        return (
+                                            <li key={item.label} className="px-[16px]">
+                                                <Link
+                                                    to={item.to}
+                                                    onClick={close}
+                                                    aria-current={active ? "page" : undefined}
+                                                    className={`${inter} flex h-[42px] items-center gap-[12px] rounded-[10px] px-[14px] text-[14px] no-underline transition-colors ${active
+                                                        ? "bg-white font-bold text-[#1f4d3f] shadow-sm"
+                                                        : "font-medium text-[#cfe3d8] hover:bg-white/10 hover:text-white"
+                                                        }`}
+                                                >
+                                                    <span className={active ? "text-[#10a28c]" : "text-[#7fb09b]"}>
+                                                        <Icon name={item.icon} />
+                                                    </span>
+                                                    {item.label}
+                                                </Link>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
                         );
                     })}
+
+                    {/* Preview ng ibang site (hindi kailangang mag-logout) */}
+                    <div role="group" aria-labelledby="admin-nav-preview" className="mt-[20px]">
+                        <GroupLabel id="admin-nav-preview">Preview site</GroupLabel>
+                        <ul className="m-0 flex list-none flex-col gap-[3px] p-0">
+                            {PREVIEW_ITEMS.map((item) => (
+                                <li key={item.label} className="px-[16px]">
+                                    <Link
+                                        to={item.to}
+                                        onClick={close}
+                                        className={`${inter} flex h-[42px] items-center gap-[12px] rounded-[10px] px-[14px] text-[14px] font-medium text-[#cfe3d8] no-underline transition-colors hover:bg-white/10 hover:text-white`}
+                                    >
+                                        <span className="text-[#7fb09b]">
+                                            <Icon name={item.icon} />
+                                        </span>
+                                        {item.label}
+                                        <span className="ml-auto text-[#7fb09b]">
+                                            <Icon name="external" size={14} />
+                                        </span>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 </nav>
 
-                {/* Preview ng ibang site (hindi kailangang mag-logout) */}
-                <div className={`${inter} mt-[32px] px-[40px] text-[14px] font-bold tracking-[2.52px] text-[#a8c8b8]`}>
-                    PREVIEW SITE
+                {/* Logout: laging nasa ilalim */}
+                <div className="shrink-0 border-t border-white/10 px-[16px] py-[16px]">
+                    <button
+                        type="button"
+                        onClick={handleLogout}
+                        className={`${inter} flex h-[42px] w-full cursor-pointer items-center gap-[12px] rounded-[10px] border-0 bg-transparent px-[14px] text-left text-[14px] font-medium text-[#cfe3d8] transition-colors hover:bg-white/10 hover:text-white`}
+                    >
+                        <span className="text-[#7fb09b]">
+                            <Icon name="logout" />
+                        </span>
+                        Logout
+                    </button>
                 </div>
-                <div className="mt-[8px] flex flex-col">
-                    {PREVIEW_ITEMS.map(({ label, to }) => (
-                        <Link
-                            key={label}
-                            to={to}
-                            onClick={close}
-                            className={`${inknut} flex items-center gap-[8px] px-[40px] py-[9px] text-[17px] font-semibold text-[#2a8570] no-underline transition-colors hover:text-[#4fbfa5]`}
-                        >
-                            {label}
-                            <ExternalIcon />
-                        </Link>
-                    ))}
-                </div>
-
-                <button
-                    type="button"
-                    onClick={handleLogout}
-                    className={`${inknut} mt-auto mb-[64px] cursor-pointer border-0 bg-transparent px-[38px] pt-[24px] text-left text-[20px] font-semibold text-[#2a8570] transition-colors hover:text-[#4fbfa5]`}
-                >
-                    Logout
-                </button>
             </aside>
 
             {/* Spacer: sa desktop lang, dahil fixed ang sidebar */}
-            <div className="hidden w-[321px] shrink-0 lg:block" aria-hidden="true" />
+            <div className="hidden w-[288px] shrink-0 lg:block" aria-hidden="true" />
         </>
     );
 }
