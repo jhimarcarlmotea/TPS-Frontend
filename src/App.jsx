@@ -31,6 +31,7 @@ import Profile from "./pages/Profile";
 import HoldExpiryModal from "./BookSession/HoldExpiryModal";
 import AdminMessages from "./admin/adminmessages";
 import About from "./About/About";
+import Paybalance from "./Paybalance/Paybalance";
 const ClientArea = ({ children }) => (
   <RequireAuth roles={["CLIENT", "ADMIN"]}>{children}</RequireAuth>
 );
@@ -60,6 +61,8 @@ export default function App() {
       <Route path="/services" element={<Services />} />
       <Route path="/signin" element={<SignIn />} />
       <Route path="/about" element={<About />} />
+      <Route path="/appointments/balance" element={<ClientArea><Paybalance /></ClientArea>} />
+      <Route path="/appointments/balance/:id" element={<ClientArea><Paybalance /></ClientArea>} />
       {/* Booking flow (CLIENT, or ADMIN for preview) — naka-wrap sa BookingProvider */}
       <Route element={<BookingLayout />}>
         <Route path="/book" element={<BookSession />} />

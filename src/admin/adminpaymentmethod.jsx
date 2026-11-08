@@ -67,6 +67,12 @@ function PricingCard({ settings, onSaved, onOpenServices }) {
     const [atTab, setAtTab] = useState(() => (assessmentTypesList[0]?.id ? String(assessmentTypesList[0].id) : ""));
 
     const [percent, setPercent] = useState(String(settings.downpayment_percent ?? 50));
+    const [psychotherapyDownpayment, setPsychotherapyDownpayment] = useState(
+        String(settings.psychotherapy_downpayment_amount ?? 750)
+    );
+    const [assessmentDownpayment, setAssessmentDownpayment] = useState(
+        String(settings.assessment_downpayment_amount ?? 750)
+    );
     const [note, setNote] = useState(settings.note || "");
     const [prices, setPrices] = useState(() =>
         Object.fromEntries(
@@ -95,13 +101,27 @@ function PricingCard({ settings, onSaved, onOpenServices }) {
         : Number(atPrices[currentAt?.id]) || 0;
 
     const pct = Number(percent) || 0;
-    const down = Math.round(currentPrice * pct) / 100;
+    const isPsychotherapy = isServices && currentService?.id === "psychotherapy";
+    const isAssessment = !isServices;
+    const psychotherapyDown = Number(psychotherapyDownpayment) || 0;
+    const assessmentDown = Number(assessmentDownpayment) || 0;
+    const down = isPsychotherapy
+        ? psychotherapyDown
+        : isAssessment
+            ? assessmentDown
+            : Math.round(currentPrice * pct) / 100;
     const fullOnly = isServices && (settings.full_only || []).includes(currentService?.id);
 
     const save = async () => {
         setMsg(null);
         if (!(pct >= 1 && pct <= 100)) {
             return setMsg({ type: "err", text: "Downpayment must be 1 to 100 percent." });
+        }
+        if (!(psychotherapyDown >= 1 && psychotherapyDown < (Number(prices.psychotherapy) || 0))) {
+            return setMsg({ type: "err", text: "Psychotherapy downpayment must be at least ₱1 and less than the session fee." });
+        }
+        if (!(assessmentDown >= 1)) {
+            return setMsg({ type: "err", text: "Assessment downpayment must be at least ₱1." });
         }
         for (const s of servicesList) {
             if (!(Number(prices[s.id]) >= 1)) {
@@ -120,6 +140,8 @@ function PricingCard({ settings, onSaved, onOpenServices }) {
                 method: "PUT",
                 body: JSON.stringify({
                     downpayment_percent: pct,
+                    psychotherapy_downpayment_amount: psychotherapyDown,
+                    assessment_downpayment_amount: assessmentDown,
                     note: note.trim() || null,
                     prices: Object.fromEntries(
                         Object.entries(prices)
@@ -283,7 +305,37 @@ function PricingCard({ settings, onSaved, onOpenServices }) {
                 .
             </p>
 
-            {fullOnly ? null : (
+            {fullOnly ? null : isPsychotherapy || isAssessment ? (
+                <>
+                    <label className={`${serif} mt-[14px] block text-[11px] text-[#666]`}>
+                        {isPsychotherapy
+                            ? "Psychotherapy downpayment (fixed amount)"
+                            : "Assessment downpayment (fixed amount for all assessment types)"}
+                    </label>
+                    <div className="relative">
+                        <span className="absolute left-[10px] top-[14px] text-[12px] text-[#666]">₱</span>
+                        <input
+                            type="number"
+                            min="1"
+                            max={isPsychotherapy ? Math.max(1, currentPrice - 0.01) : undefined}
+                            step="0.01"
+                            value={isPsychotherapy ? psychotherapyDownpayment : assessmentDownpayment}
+                            onChange={(e) => {
+                                if (isPsychotherapy) setPsychotherapyDownpayment(e.target.value);
+                                else setAssessmentDownpayment(e.target.value);
+                            }}
+                            className={`${fieldCls} pl-[24px]`}
+                        />
+                    </div>
+                    <p className={`${serif} mt-[6px] text-[11px] text-[#2a8570]`}>
+                        {isPsychotherapy
+                            ? `Client pays ${peso(down)} now, balance ${peso(Math.max(0, currentPrice - down))}. Enter the amount in pesos; it does not change with the session fee.`
+                            : currentAt
+                                ? `${peso(down)} applies to every assessment type. For ${currentAt.name}, the remaining balance is ${peso(Math.max(0, currentPrice - down))}${down >= currentPrice ? "; downpayment is unavailable because this amount meets or exceeds the assessment fee" : ""}.`
+                                : "Enter one fixed peso amount shared by all assessment types."}
+                    </p>
+                </>
+            ) : (
                 <>
                     <label className={`${serif} mt-[14px] block text-[11px] text-[#666]`}>Downpayment (% of the fee)</label>
                     <input
@@ -297,7 +349,7 @@ function PricingCard({ settings, onSaved, onOpenServices }) {
                     />
                     <p className={`${serif} mt-[6px] text-[11px] text-[#2a8570]`}>
                         Client pays {peso(down)} now, balance {peso(Math.max(0, currentPrice - down))}. Set 100 to require full payment only.
-                        The downpayment percent applies to Psychotherapy, Assessment Types, and custom services.
+                        The downpayment percent applies to ABA and custom services.
                     </p>
                 </>
             )}
@@ -660,7 +712,7 @@ export default function PaymentMethods() {
                             prices &amp; payment methods.
                         </h1>
                         <p className={`${serif} mt-[8px] max-w-[520px] text-[14px] font-bold text-[#2f4a42]`}>
-                            Set the fee for each service, the downpayment percent, and where clients should send their money.
+                            Set fees, fixed-peso downpayments for Psychotherapy and Assessment, other downpayment terms, and where clients should send their money.
                         </p>
                     </div>
                     <div className="flex items-center gap-[17px]">

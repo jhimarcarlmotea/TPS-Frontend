@@ -3,8 +3,11 @@ import { useNavigate } from "react-router-dom";
 import AdminNavigation from "./adminnavigation";
 import ProfileMenu from "../components/ProfileMenu";
 import { apiFetch } from "../auth";
-import { peso, to12 } from "../components/payUtils";
-
+import { peso } from "../components/payUtils";
+import {
+  PaymentRow as SharedPaymentRow,
+  ReceiptModal as SharedReceiptModal,
+} from "../components/PaymentParts";
 const FONT_CSS = `@import url('https://fonts.googleapis.com/css2?family=Inknut+Antiqua:wght@600&family=Inria+Serif:wght@400;700&family=Inter:wght@400;600;700&display=swap');`;
 
 const inter = "font-['Inter',Helvetica,sans-serif]";
@@ -51,25 +54,7 @@ const Calendar = (p) => (
     <path d="M3 10h18" />
   </Icon>
 );
-const CheckCircle = (p) => (
-  <Icon {...p}>
-    <circle cx="12" cy="12" r="10" />
-    <path d="m9 12 2 2 4-4" />
-  </Icon>
-);
-const AlertCircle = (p) => (
-  <Icon {...p}>
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 8v4" />
-    <path d="M12 16h.01" />
-  </Icon>
-);
-
-const statusBadge = {
-  to_verify: ["To verify", "bg-[#fdf1bc] text-[#7a5400]"],
-  verified: ["Verified", "bg-[#e3f2ee] text-[#2a8570]"],
-  rejected: ["Rejected", "bg-red-100 text-red-700"],
-};
+const PAYMENTS_PER_PAGE = 10;
 
 /* ---------- Page ---------- */
 export default function PaymentDashboard() {
@@ -79,6 +64,7 @@ export default function PaymentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
   const [open, setOpen] = useState(null);
 
   const load = () => {
@@ -104,11 +90,18 @@ export default function PaymentDashboard() {
     );
   }, [payments, searchTerm]);
 
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAYMENTS_PER_PAGE));
+  const currentPage = Math.min(page, pageCount);
+  const pageItems = filtered.slice(
+    (currentPage - 1) * PAYMENTS_PER_PAGE,
+    currentPage * PAYMENTS_PER_PAGE
+  );
+
   const groups = useMemo(() => {
     const today = new Date().toDateString();
     const yest = new Date(Date.now() - 86400000).toDateString();
     const map = new Map();
-    filtered.forEach((p) => {
+    pageItems.forEach((p) => {
       const d = new Date(p.created_at);
       const key = d.toDateString();
       const label =
@@ -123,7 +116,7 @@ export default function PaymentDashboard() {
       map.get(key).items.push(p);
     });
     return [...map.values()];
-  }, [filtered]);
+  }, [pageItems]);
 
   const onUpdated = (np) => {
     setPayments((list) => list.map((p) => (p.id === np.id ? np : p)));
@@ -210,7 +203,10 @@ export default function PaymentDashboard() {
               type="text"
               placeholder="Search client or reference"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
+              }}
               className={`${serif} w-full rounded-[10px] border border-[#c7b6b6] bg-white py-2 pl-9 pr-4 text-[13px] text-black focus:outline-none focus:ring-2 focus:ring-[#4a9b8e]`}
             />
           </div>
@@ -227,10 +223,36 @@ export default function PaymentDashboard() {
         {groups.map((g) => (
           <Group key={g.label} label={g.label} items={g.items} onOpen={setOpen} />
         ))}
+        {!loading && !error && filtered.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-[#d8dedb] py-4">
+            <p className={`${serif} m-0 text-[12px] text-[#666]`}>
+              Showing {(currentPage - 1) * PAYMENTS_PER_PAGE + 1}–{Math.min(currentPage * PAYMENTS_PER_PAGE, filtered.length)} of {filtered.length} payments
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+                disabled={currentPage === 1}
+                className={`${serif} rounded-[6px] border border-[#c7b6b6] bg-white px-3 py-1.5 text-[12px] text-[#202020] disabled:cursor-not-allowed disabled:opacity-45`}
+              >
+                Previous
+              </button>
+              <span className={`${inter} text-[11px] text-[#666]`}>Page {currentPage} of {pageCount}</span>
+              <button
+                type="button"
+                onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+                disabled={currentPage === pageCount}
+                className={`${serif} rounded-[6px] border border-[#c7b6b6] bg-white px-3 py-1.5 text-[12px] text-[#202020] disabled:cursor-not-allowed disabled:opacity-45`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
       {open && (
-        <ReceiptModal p={open} base={API_BASE} onClose={() => setOpen(null)} onUpdated={onUpdated} />
+        <SharedReceiptModal p={open} base={API_BASE} onClose={() => setOpen(null)} onUpdated={onUpdated} />
       )}
     </div>
   );
@@ -245,7 +267,7 @@ function Group({ label, items, onOpen }) {
       </div>
       <div className="space-y-[14px]">
         {items.map((item) => (
-          <PaymentRow key={item.id} data={item} onOpen={onOpen} />
+          <SharedPaymentRow key={item.id} data={item} onOpen={onOpen} />
         ))}
       </div>
     </section>
@@ -269,262 +291,6 @@ function StatCard({ title, value, subtitle, variant = "light" }) {
       <div className={`${inter} text-[11px] font-bold ${label}`}>{title}</div>
       <div className={`${inter} mt-[14px] text-[32px] font-bold leading-none ${num}`}>{value}</div>
       <p className={`${inter} mt-[12px] text-[11px] font-bold ${sub}`}>{subtitle}</p>
-    </div>
-  );
-}
-
-function PaymentRow({ data, onOpen }) {
-  const created = new Date(data.created_at);
-  const isPending = data.status === "to_verify";
-  const isDownpayment = data.payment_type === "down";
-  const [statusText, statusCls] = statusBadge[data.status] || statusBadge.to_verify;
-  const sched = `${new Date(data.date + "T00:00").toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  })}, ${to12(data.start_time)}`;
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-[10px] border border-[#c7b6b6] bg-white p-4 transition hover:shadow-md md:flex-nowrap">
-      {/* Date badge */}
-      <div className="min-w-[90px] rounded-[8px] bg-[#e3f2ee] p-3 text-center">
-        <div className={`${serif} text-2xl font-bold leading-none text-[#2f4a42]`}>{created.getDate()}</div>
-        <div className={`${serif} text-xs text-[#2a8570]`}>
-          {created.toLocaleDateString("en-US", { month: "short" })}
-        </div>
-        <div className={`${serif} mt-1 text-[10px] text-[#666]`}>
-          {created.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-        </div>
-      </div>
-
-      {/* Client */}
-      <div className="min-w-[200px] flex-1">
-        <h4 className={`${serif} text-[16px] font-bold text-black`}>{data.client_name || "Client"}</h4>
-        <p className={`${serif} text-[12px] text-[#666]`}>
-          {data.service_name} · {sched}
-        </p>
-      </div>
-
-      {/* Badges */}
-      <div className="flex items-center gap-2">
-        <span
-          className={`${inter} rounded-full px-3 py-1 text-[11px] font-bold ${isDownpayment ? "bg-[#fdf1bc] text-[#7a5400]" : "bg-[#e3f2ee] text-[#2a8570]"
-            }`}
-        >
-          {isDownpayment ? "Downpayment" : "Full payment"}
-        </span>
-        <span className={`${inter} rounded-full bg-[#f2f2f2] px-3 py-1 text-[11px] font-bold text-[#202020]`}>
-          {data.method}
-        </span>
-      </div>
-
-      {/* Amount */}
-      <div className="min-w-[100px] text-right">
-        <div className={`${inter} text-[16px] font-bold text-[#202020]`}>{peso(data.amount_paid)}</div>
-        <div className={`${serif} text-[11px] text-[#666]`}>
-          {isDownpayment ? `Balance ${peso(data.balance)}` : "Paid in full"}
-        </div>
-      </div>
-
-      {/* Status & action */}
-      <div className="flex items-center gap-3">
-        <span className={`${inter} flex items-center gap-1 rounded px-2 py-1 text-[11px] font-bold ${statusCls}`}>
-          {isPending ? (
-            <AlertCircle className="h-3.5 w-3.5" />
-          ) : data.status === "verified" ? (
-            <CheckCircle className="h-3.5 w-3.5" />
-          ) : null}
-          {statusText}
-        </span>
-
-        <button
-          type="button"
-          onClick={() => onOpen(data)}
-          className={`${serif} cursor-pointer rounded-[6px] px-4 py-1.5 text-[12px] transition ${isPending
-              ? "border-0 bg-[#11a086] text-white hover:bg-[#0e8c75]"
-              : "border border-[#c7b6b6] bg-white text-[#2f4a42] hover:bg-[#e3f2ee]"
-            }`}
-        >
-          {isPending ? "Review receipt" : "View receipt"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-const QUICK_REPLIES = [
-  ["Number mismatch", "The sender number you entered does not match the one in your proof of payment."],
-  ["Wrong amount", "The amount in your proof of payment does not match the amount due."],
-  ["Reference mismatch", "The reference number you entered does not match your receipt."],
-  ["Blurry receipt", "Your receipt is blurry or cut off. Please upload a clear, full screenshot."],
-  ["Not received", "We could not find this payment in our account yet. Please check and send it again."],
-  ["Wrong method", "The receipt shows a different payment method than the one you selected."],
-];
-
-function ReceiptModal({ p, base, onClose, onUpdated }) {
-  const [busy, setBusy] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
-  const [reason, setReason] = useState("");
-  const [error, setError] = useState("");
-
-  const act = async (kind) => {
-    setBusy(true);
-    setError("");
-    try {
-      const d = await apiFetch(`${base}/payments/${p.id}/${kind}`, {
-        method: "POST",
-        body: JSON.stringify(kind === "reject" ? { reason: reason.trim() } : {}),
-      });
-      onUpdated(d.payment);
-      setRejecting(false);
-      setReason("");
-    } catch (err) {
-      setError(err.message || "Something went wrong.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const rows = [
-    ["Reference", p.reference],
-    ["Client", p.client_name],
-    ["Email", p.client_email],
-    ["Mobile", p.client_mobile],
-    ["Service", p.service_name],
-    [
-      "Schedule",
-      `${new Date(p.date + "T00:00").toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })} · ${to12(p.start_time)} - ${to12(p.end_time)}`,
-    ],
-    ["Method", p.method],
-    ["Sender number", p.wallet_number],
-    ["Reference no.", p.reference_number],
-    ["Session fee", peso(p.total_amount)],
-    ["Amount paid", peso(p.amount_paid)],
-    ["Balance", peso(p.balance)],
-  ];
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-black/45 p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="grid w-full max-w-3xl grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 rounded-2xl bg-white p-6 shadow-xl max-[720px]:grid-cols-1">
-        <div>
-          <h3 className={`${serif} m-0 mb-3 text-xl text-[#202020]`}>Proof of payment</h3>
-          <a href={p.receipt_url} target="_blank" rel="noreferrer">
-            <img
-              src={p.receipt_url}
-              alt="Receipt"
-              className="max-h-[460px] w-full rounded-lg border border-black/10 object-contain"
-            />
-          </a>
-          <p className={`${serif} mt-2 text-[11px] text-[#666]`}>Click the image to open it full size.</p>
-        </div>
-
-        <div>
-          <h3 className={`${serif} m-0 mb-3 text-xl text-[#202020]`}>Details</h3>
-          <dl className="m-0 grid gap-2 text-sm">
-            {rows.map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-3">
-                <dt className="m-0 text-[#666]">{k}</dt>
-                <dd className="m-0 break-all text-right font-medium text-[#202020]">{v || "—"}</dd>
-              </div>
-            ))}
-          </dl>
-
-          {p.status === "rejected" && p.reject_reason && (
-            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-              Message sent to client: {p.reject_reason}
-            </p>
-          )}
-
-          {error && (
-            <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-              {error}
-            </p>
-          )}
-
-          {rejecting && (
-            <div className="mt-4">
-              <p className={`${inter} m-0 mb-2 text-[11px] font-bold tracking-[1.5px] text-[#666]`}>
-                MESSAGE TO CLIENT
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {QUICK_REPLIES.map(([label, text]) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setReason(text)}
-                    className={`${serif} cursor-pointer rounded-full border px-3 py-1 text-[12px] transition ${
-                      reason === text
-                        ? "border-[#11a086] bg-[#e3f2ee] text-[#1f6b55]"
-                        : "border-[#c7b6b6] bg-white text-[#202020] hover:bg-[#f2f2f2]"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <textarea
-                rows={3}
-                maxLength={255}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Tap a quick reply above, or write your own message…"
-                className={`${serif} mt-3 w-full resize-none rounded-md border border-black/20 p-2 text-sm`}
-              />
-              <p className={`${serif} m-0 mt-1 text-right text-[11px] text-[#888]`}>{reason.length}/255</p>
-              <p className={`${serif} m-0 mt-1 text-[11px] text-[#666]`}>
-                The client will see this message on their appointment status page and will be asked to go back to payment.
-              </p>
-            </div>
-          )}
-
-          <div className="mt-5 flex flex-wrap justify-end gap-3">
-            <button
-              type="button"
-              onClick={rejecting ? () => { setRejecting(false); setReason(""); setError(""); } : onClose}
-              className={`${serif} cursor-pointer rounded-md border border-[#c7b6b6] bg-white px-4 py-2 text-sm`}
-            >
-              {rejecting ? "Cancel" : "Close"}
-            </button>
-            {p.status === "to_verify" && !rejecting && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => setRejecting(true)}
-                className={`${serif} cursor-pointer rounded-md border border-red-300 bg-white px-4 py-2 text-sm text-red-700 disabled:opacity-60`}
-              >
-                Reject
-              </button>
-            )}
-            {p.status === "to_verify" && rejecting && (
-              <button
-                type="button"
-                disabled={busy || reason.trim().length < 3}
-                onClick={() => act("reject")}
-                className={`${serif} cursor-pointer rounded-md border-0 bg-red-600 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60`}
-              >
-                {busy ? "Please wait…" : "Send message & reject"}
-              </button>
-            )}
-            {p.status === "to_verify" && !rejecting && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => act("verify")}
-                className={`${serif} cursor-pointer rounded-md border-0 bg-[#11a086] px-4 py-2 text-sm text-white hover:bg-[#0e8c75] disabled:opacity-60`}
-              >
-                {busy ? "Please wait…" : "Verify payment"}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

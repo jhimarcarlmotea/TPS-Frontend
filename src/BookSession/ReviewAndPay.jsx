@@ -59,6 +59,7 @@ export default function ReviewAndPay() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showDownWarn, setShowDownWarn] = useState(false);
+  const [confirmingDownSelection, setConfirmingDownSelection] = useState(false);
 
   useEffect(() => {
     if (!serviceId) return;
@@ -90,12 +91,17 @@ export default function ReviewAndPay() {
 
   const price = options?.price ?? 0;
   const percent = options?.downpayment_percent ?? 50;
-  const downAvailable = percent < 100 && options?.downpayment_allowed !== false;
+  const isPsycho = serviceId === "psychotherapy";
+  const isFixedDownpayment = isPsycho || serviceId === "assessment";
+  const downAmount = isFixedDownpayment
+    ? Number(options?.downpayment_amount) || 0
+    : Math.round(price * percent) / 100;
+  const downAvailable =
+    options?.downpayment_allowed !== false && downAmount > 0 && downAmount < price;
   const methods = options?.methods || [];
   const method = methods.find((m) => m.id === methodId) || null;
 
   const effectiveType = downAvailable ? type : "full";
-  const downAmount = Math.round(price * percent) / 100;
   const amountDue = effectiveType === "full" ? price : downAmount;
   const remaining = Math.round((price - amountDue) * 100) / 100;
 
@@ -121,7 +127,6 @@ export default function ReviewAndPay() {
     ? new Date(d.year, d.month, d.day).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "";
 
-  const isPsycho = serviceId === "psychotherapy";
   const psychName = isPsycho ? booking.psychologist?.name || "—" : "Assigned by the clinic";
 
   const summaryRows = [
@@ -185,7 +190,7 @@ export default function ReviewAndPay() {
 
   const tryProceed = () => {
     if (!isFormValid || submitting) return;
-    if (effectiveType === "down") {
+    if (effectiveType === "down" && serviceId !== "psychotherapy") {
       setShowDownWarn(true);
       return;
     }
@@ -277,7 +282,7 @@ export default function ReviewAndPay() {
                     ? [
                       {
                         id: "down",
-                        title: `Downpayment (${percent}%)`,
+                        title: isFixedDownpayment ? "Downpayment" : `Downpayment (${percent}%)`,
                         amount: downAmount,
                         note: `Remaining ${peso(price - downAmount)} due after the session`,
                       },
@@ -287,7 +292,14 @@ export default function ReviewAndPay() {
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => setType(opt.id)}
+                    onClick={() => {
+                      if (opt.id === "down" && isPsycho) {
+                        setConfirmingDownSelection(true);
+                        setShowDownWarn(true);
+                        return;
+                      }
+                      setType(opt.id);
+                    }}
                     className={[
                       "rounded-xl border p-4 text-left cursor-pointer transition-[border-color,background] duration-150",
                       effectiveType === opt.id
@@ -485,27 +497,42 @@ export default function ReviewAndPay() {
           aria-modal="true"
           aria-labelledby="down-warn-title"
         >
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 id="down-warn-title" className="m-0 font-serif text-xl text-[#202020]">
-              Confirm downpayment
+          <div className="w-full max-w-md rounded-2xl border border-red-200 bg-red-50 p-6 shadow-xl">
+            <h3 id="down-warn-title" className="m-0 font-serif text-xl text-red-800">
+              {confirmingDownSelection ? "Downpayment reminder" : "Confirm downpayment"}
             </h3>
-            <p className="mt-3 text-sm leading-relaxed text-[#555]">
-              You are paying <strong>{peso(amountDue)}</strong> now. The remaining balance of{" "}
-              <strong>{peso(remaining)}</strong> is due after your session. Continue with downpayment?
+            <p className="mt-3 text-sm leading-relaxed text-red-900">
+              {confirmingDownSelection
+                ? <>You will pay <strong>{peso(downAmount)}</strong> now. The remaining balance of{" "}
+                  <strong>{peso(price - downAmount)}</strong> must be paid after your psychotherapy session.</>
+                : <>You are paying <strong>{peso(amountDue)}</strong> now. The remaining balance of{" "}
+                  <strong>{peso(remaining)}</strong> is due after your session. Continue with downpayment?</>}
             </p>
             <div className="mt-6 flex flex-wrap justify-end gap-3">
-              <button type="button" className={btnGhost} onClick={() => setShowDownWarn(false)}>
-                Cancel
+              <button
+                type="button"
+                className={btnGhost}
+                onClick={() => {
+                  setShowDownWarn(false);
+                  setConfirmingDownSelection(false);
+                }}
+              >
+                {confirmingDownSelection ? "Choose full payment" : "Cancel"}
               </button>
               <button
                 type="button"
-                className={btnSolid}
+                className={`${btnSolid} !bg-red-700 hover:!shadow-[0_10px_22px_-8px_rgba(153,27,27,0.45)]`}
                 onClick={() => {
                   setShowDownWarn(false);
-                  commitAndGo();
+                  if (confirmingDownSelection) {
+                    setType("down");
+                    setConfirmingDownSelection(false);
+                  } else {
+                    commitAndGo();
+                  }
                 }}
               >
-                Continue with downpayment
+                {confirmingDownSelection ? "I understand, select downpayment" : "Continue with downpayment"}
               </button>
             </div>
           </div>

@@ -151,6 +151,15 @@ export default function ProfileMenu({ size = 40 }) {
           >
             {homeLabel}
           </Link>
+          {user.role === "CLIENT" && (
+            <Link
+              to="/appointments/balance"
+              onClick={() => setOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm text-[#202020] no-underline hover:bg-tf-soft"
+            >
+              Balance
+            </Link>
+          )}
 
           {/* Logout Section */}
           <div className="my-2 h-px bg-black/10" />

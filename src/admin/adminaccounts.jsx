@@ -7,7 +7,7 @@ const FONT_CSS = `@import url('https://fonts.googleapis.com/css2?family=Inria+Se
 const inter = "font-['Inter',Helvetica,sans-serif]";
 const serif = "font-['Inria_Serif',Georgia,serif]";
 
-const ROLES = ["All", "Client", "Psychologist", "Affiliate", "Admin"];
+const ROLES = ["All", "Client", "Affiliate", "Admin"];
 const STATUS_STYLE = {
     Active: "bg-[#d7eee8] text-[#1f6b55]",
     Pending: "bg-[#fdf1bc] text-[#8a6a00]",
@@ -185,7 +185,7 @@ const AccountModal = ({ account, onClose, onSave }) => {
                         <Field label="Role">
                             <select className={inputCls} value={form.role} onChange={set("role")}>
                                 <option value="CLIENT">Client</option>
-                                <option value="AFFILIATE">Affiliate / Psychologist</option>
+                                <option value="AFFILIATE">Affiliate</option>
                                 <option value="ADMIN">Admin</option>
                             </select>
                         </Field>
@@ -229,6 +229,7 @@ export default function AdminAccounts() {
     const [query, setQuery] = useState("");
     const [page, setPage] = useState(1);
     const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
+    const [roleCounts, setRoleCounts] = useState({ All: 0, Client: 0, Affiliate: 0, Admin: 0 });
     const [modal, setModal] = useState(null);
     const [toast, setToast] = useState("");
     const [navOpen, setNavOpen] = useState(false);
@@ -251,6 +252,7 @@ export default function AdminAccounts() {
             .then((data) => {
                 setAccounts(data.accounts || []);
                 if (data.meta) setMeta(data.meta);
+                if (data.role_counts) setRoleCounts(data.role_counts);
             })
             .catch((err) => notify(err.message || "Failed to load accounts."))
             .finally(() => setLoading(false));
@@ -384,7 +386,7 @@ export default function AdminAccounts() {
                 </header>
 
                 {/* Role selection tabs */}
-                <div className="mt-[24px] grid grid-cols-2 gap-[12px] sm:mt-[34px] lg:grid-cols-5 lg:gap-[16px]">
+                <div className="mt-[24px] grid grid-cols-2 gap-[12px] sm:mt-[34px] lg:grid-cols-4 lg:gap-[16px]">
                     {ROLES.map((r) => {
                         const on = role === r;
                         return (
@@ -400,7 +402,7 @@ export default function AdminAccounts() {
                                     {r === "All" ? "ALL ROLES" : r.toUpperCase()}
                                 </div>
                                 <div className={`${inter} mt-[10px] text-[20px] font-bold sm:mt-[14px] sm:text-[24px] ${on ? "text-white" : "text-[#202020]"}`}>
-                                    {r === role ? meta.total : "—"}
+                                    {roleCounts[r] ?? 0}
                                 </div>
                             </button>
                         );

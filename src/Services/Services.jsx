@@ -217,6 +217,7 @@ function normalize(s) {
     assessment_types: Array.isArray(s.assessment_types) ? s.assessment_types : [],
     label: `${hours} · HOUR SESSION`,
     price: Number(s.price) || 0,
+    downpayment_amount: Number(s.downpayment_amount) || 0,
     imageUrl: s.image_url || "",
     downpayment_percent: Number(s.downpayment_percent) || 0,
     full_only: !!s.full_only,
@@ -226,6 +227,11 @@ function normalize(s) {
 
 /* Downpayment in pesos, or 0 when the service is full-payment only. */
 function downpaymentOf(s) {
+  if (s.id === "psychotherapy") {
+    return s.price > 0 && s.downpayment_amount > 0 && s.downpayment_amount < s.price
+      ? s.downpayment_amount
+      : 0;
+  }
   if (!s.price || s.full_only || !(s.downpayment_percent > 0) || s.downpayment_percent >= 100) return 0;
   return Math.round(s.price * s.downpayment_percent) / 100;
 }
@@ -538,6 +544,11 @@ function Service({ s, index }) {
                       {t.price > 0 && (
                         <span className="block font-serif text-[14px] font-bold text-[#10a28c]">
                           {peso(t.price)}
+                        </span>
+                      )}
+                      {t.downpayment_amount > 0 && (
+                        <span className="block font-serif text-[11px] text-[#777]">
+                          {peso(t.downpayment_amount)} downpayment
                         </span>
                       )}
                       <span className="block text-[11px] text-[#888]">

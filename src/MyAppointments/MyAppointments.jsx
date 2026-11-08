@@ -26,21 +26,28 @@ const MESSAGES = {
   Expired: "This appointment was not approved before its schedule.",
 };
 
+const BALANCE_ROUTE = (id) => `/appointments/balance/${id}`;
+const BALANCE_PAYABLE = ["Confirmed", "Pending approval", "Completed"];
 const toItem = (a) => {
   const start = new Date(`${a.date}T${a.start_time}:00`);
+  const sameDay = start.toDateString() === new Date().toDateString();
   const upcoming = a.tab === "upcoming";
   const pendingPay = a.label === "Pending payment verification";
   const balance = Number(a.balance) || 0;
-
+  const balanceReview = balance > 0 && a.balance_status === "to_verify";
+  const canPayBalance =
+    balance > 0 && a.tab !== "cancelled" && BALANCE_PAYABLE.includes(a.label) && !balanceReview;
+ 
   let payment = "Paid in full";
   if (a.tab === "cancelled") payment = "No refund";
   else if (pendingPay) payment = "Pending verification";
+  else if (balanceReview) payment = "Balance under review";
   else if (balance > 0) payment = "Downpayment received";
-
+ 
   let consent = "Pending";
   if (a.consent_status === "not_required") consent = "Not required";
   else if (a.consent_status === "submitted") consent = "Completed";
-
+ 
   return {
     id: String(a.id),
     raw: a,
@@ -57,10 +64,14 @@ const toItem = (a) => {
     status: a.label,
     payment,
     balance,
+    canPayBalance,
+    balanceReview,
     consent,
     target: upcoming ? start.getTime() : null,
     message: MESSAGES[a.label] || "",
-    canChange: !!(a.can_reschedule && a.can_cancel),
+    canChange: !!a.can_reschedule,
+    canCancel: !!a.can_cancel,
+    sameDay,
   };
 };
 
@@ -371,7 +382,19 @@ export default function MyAppointments() {
                       >
                         Join Video Call
                       </button>
-
+                      {next.canPayBalance && (
+                      <Link
+                        to={BALANCE_ROUTE(next.id)}
+                        className="rounded-lg bg-amber-300 px-6 py-2 text-center text-sm font-bold text-[#3b2a00] no-underline shadow transition hover:bg-amber-200"
+                      >
+                        Pay balance · ₱{next.balance.toLocaleString()}
+                      </Link>
+                    )}
+                    {next.balanceReview && (
+                      <span className="rounded-lg bg-white/10 px-4 py-2 text-xs font-semibold">
+                        Balance receipt under review
+                      </span>
+                    )}
                       {next.canChange && (
                         <div className="flex gap-4">
                           <button
@@ -381,13 +404,17 @@ export default function MyAppointments() {
                           >
                             Reschedule
                           </button>
-                          <button
-                            type="button"
-                            className="cursor-pointer border-0 bg-transparent p-0 text-sm text-white underline"
-                            onClick={() => setDialog({ type: "cancel", id: next.id })}
-                          >
-                            Cancel
-                          </button>
+                          {next.canCancel ? (
+                            <button
+                              type="button"
+                              className="cursor-pointer border-0 bg-transparent p-0 text-sm text-white underline"
+                              onClick={() => setDialog({ type: "cancel", id: next.id })}
+                            >
+                              Cancel
+                            </button>
+                          ) : next.sameDay ? (
+                            <span className="text-xs text-white/80">Same-day sessions can’t be cancelled.</span>
+                          ) : null}
                         </div>
                       )}
                     </div>
@@ -473,10 +500,21 @@ export default function MyAppointments() {
                           </div>
 
                           {apt.balance > 0 && apt.tab !== "cancelled" && (
-                            <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                              Remaining balance: ₱{apt.balance.toLocaleString()}
-                            </p>
-                          )}
+                          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                            <span>Remaining balance: ₱{apt.balance.toLocaleString()}</span>
+                            {apt.canPayBalance && (
+                              <Link
+                                to={BALANCE_ROUTE(apt.id)}
+                                className="rounded-md bg-[#2a6a53] px-3 py-1.5 text-xs font-semibold text-white no-underline hover:bg-[#235845]"
+                              >
+                                Pay balance
+                              </Link>
+                            )}
+                            {apt.balanceReview && (
+                              <span className="text-xs font-semibold">Balance receipt under review</span>
+                            )}
+                          </div>
+                        )}
 
                           {apt.message && (
                             <p className="mb-5 rounded-lg bg-[#9ac5be]/24 px-4 py-3 text-[0.8rem]">
@@ -511,13 +549,17 @@ export default function MyAppointments() {
                                 >
                                   Reschedule
                                 </button>
-                                <button
-                                  type="button"
-                                  className={`${cardLinkClass} text-[#dc0000]`}
-                                  onClick={() => setDialog({ type: "cancel", id: apt.id })}
-                                >
-                                  Cancel
-                                </button>
+                                {apt.canCancel ? (
+                                  <button
+                                    type="button"
+                                    className={`${cardLinkClass} text-[#dc0000]`}
+                                    onClick={() => setDialog({ type: "cancel", id: apt.id })}
+                                  >
+                                    Cancel
+                                  </button>
+                                ) : apt.sameDay ? (
+                                  <span className="text-xs text-[#666]">Same-day sessions can’t be cancelled.</span>
+                                ) : null}
                               </>
                             )}
                           </div>
