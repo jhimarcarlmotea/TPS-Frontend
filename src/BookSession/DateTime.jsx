@@ -143,6 +143,7 @@ export default function DateTime() {
   const [daysLoading, setDaysLoading] = useState(false);
   const [slots, setSlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [recs, setRecs] = useState([]); // history-based recommendations (Stage 2)
   const [psychList, setPsychList] = useState([]);
   const [psychLoading, setPsychLoading] = useState(false);
   const [holding, setHolding] = useState(false);
@@ -220,6 +221,41 @@ export default function DateTime() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarReady, serviceId, mode, psychId, year, month, day]);
+
+  // Recommended times (galing sa engine, base sa huling completed session ng client)
+  const fetchRecs = (startTime) => {
+    const q = new URLSearchParams({ service: serviceId, date: ymd(year, month, day) });
+    if (isPsycho && psychId) q.set("psychologist_id", psychId);
+    if (serviceId === "assessment" && booking.assessmentTypeId) q.set("assessment_type_id", booking.assessmentTypeId);
+    if (startTime) q.set("start_time", startTime);
+    return apiFetch(`/booking/recommendations?${q}`).then((d) => d.recommendations || []);
+  };
+
+  useEffect(() => {
+    setRecs([]);
+    if (isResched || !calendarReady || !day || slotsLoading) return;
+    if (isPsycho && !psychId) return;
+    let alive = true;
+    fetchRecs()
+      .then((r) => alive && setRecs(r))
+      .catch(() => { });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarReady, serviceId, psychId, year, month, day, slotsLoading]);
+
+  // Pinili ng client ang isang recommendation: lipat sa petsa/oras na iyon
+  const applyRec = (r) => {
+    if (holding) return;
+    const [y, m, d] = r.date.split("-").map(Number);
+    if (booking.holdId) releaseHold();
+    setError("");
+    setYear(y);
+    setMonth(m - 1);
+    setDay(d);
+    setSlot({ start: r.start, end: r.end });
+  };
 
   // 3) Listahan ng psychologists
   useEffect(() => {
@@ -368,8 +404,14 @@ export default function DateTime() {
       setPsychList((prev) => prev.filter((x) => x.id !== psychId));
       update({ psychologistId: null, psychologist: null });
     } else {
-      setSlots((prev) => prev.filter((p) => p.start_time !== slot?.start));
+      const failedStart = slot?.start;
+      setSlots((prev) => prev.filter((p) => p.start_time !== failedStart));
       setSlot(null);
+      if (failedStart && !isResched) {
+        fetchRecs(failedStart)
+          .then((r) => setRecs(r))
+          .catch(() => { });
+      }
     }
   };
 
@@ -759,6 +801,49 @@ export default function DateTime() {
                               </p>
                             )}
                           </>
+                        )}
+
+                        {/* Morning → Afternoon → Recommendations */}
+                        {!slotsLoading && recs.length > 0 && (
+                          <div className="mt-5 rounded-xl border border-tf-teal/30 bg-[#f9fcfb] p-4">
+                            <p className="m-0 font-serif font-bold text-[#3d5c52] text-[0.72rem] tracking-[0.1em]">
+                              RECOMMENDED FOR YOU
+                            </p>
+                            <p className="m-0 mt-1 mb-3 text-xs text-[#666]">
+                              Based on your previous session. Pick one to select it.
+                            </p>
+                            <div className="grid gap-2">
+                              {recs.map((r) => {
+                                const [ry, rm, rd] = r.date.split("-").map(Number);
+                                const label = new Date(ry, rm - 1, rd).toLocaleDateString("en-US", {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                });
+                                const chosen =
+                                  slot?.start === r.start && day === rd && month === rm - 1 && year === ry;
+                                return (
+                                  <button
+                                    key={`${r.date}-${r.start}`}
+                                    type="button"
+                                    disabled={holding}
+                                    onClick={() => applyRec(r)}
+                                    className={[
+                                      "flex items-center justify-between gap-3 rounded-lg border bg-white px-4 py-2.5 text-left text-sm cursor-pointer disabled:opacity-55",
+                                      chosen ? "border-[2px] border-tf-teal" : "border-black/[0.15]",
+                                    ].join(" ")}
+                                  >
+                                    <span className="font-medium text-[#202020]">
+                                      {label} · {to12(r.start)} - {to12(r.end)}
+                                    </span>
+                                    <span className="text-xs text-tf-teal">
+                                      {r.tier === "HISTORY_MATCH" ? "Your usual time" : "Close to your usual time"}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                         )}
                       </>
                     )}
